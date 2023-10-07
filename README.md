@@ -54,6 +54,13 @@ cd beacon1
 ./validator.sh
 ```
 
+* Reopen a new bash and start the monitor script.
+
+```
+cd beacon2
+python3 execution.py
+```
+
 ## **3 Experimental results**<a id="chapter-003"></a>
 
 A typical epoch that has been attacked. The attestor role of honest validator in epoch 17 is shown here.
