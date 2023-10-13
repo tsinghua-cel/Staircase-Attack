@@ -18,8 +18,7 @@ This is an attack implementation against incentive of Ethereum PoS.
 ## **2 Run the Testnet Step by Step**<a id="chapter-002"></a>
 We establish 1000 validators for testing. Among them, the honest validators run the code in folder beacon1 while the Byzantine validators run the code in folder beacon2.
 
-* Start the execution layer of Eth 2.0. The command will ask you to input a password for your secret key. You can just hit enter three times to leave it empty.
-
+* Start the execution layer of Eth 2.0.
 ```
 ./execution.sh
 ```
