@@ -67,13 +67,11 @@ func VerifyAttestationNoVerifySignature(
 
 	if data.Target.Epoch == currEpoch {
 		if !beaconState.MatchCurrentJustifiedCheckpoint(data.Source) {
-			fmt.Printf("attestation: %v\n", data)
-			return errors.New("source check point not equal to current justified checkpoint")
+			return errors.New("source checkpoint not equal to current justified checkpoint")
 		}
 	} else {
 		if !beaconState.MatchPreviousJustifiedCheckpoint(data.Source) {
-			fmt.Printf("attestation: %v\n", data)
-			return errors.New("source check point not equal to previous justified checkpoint")
+			return errors.New("source checkpoint not equal to previous justified checkpoint")
 		}
 	}
 
