@@ -52,13 +52,13 @@ func (vs *Server) getExecutionPayload(ctx context.Context, slot types.Slot, vIdx
 		// If fee recipient is not found in DB and not set from beacon node CLI,
 		// use the burn address.
 		if feeRecipient.String() == params.BeaconConfig().EthBurnAddressHex {
-			logrus.WithFields(logrus.Fields{
-				"validatorIndex": vIdx,
-				"burnAddress":    params.BeaconConfig().EthBurnAddressHex,
-			}).Warn("Fee recipient is currently using the burn address, " +
-				"you will not be rewarded transaction fees on this setting. " +
-				"Please set a different eth address as the fee recipient. " +
-				"Please refer to our documentation for instructions")
+			// logrus.WithFields(logrus.Fields{
+			// 	"validatorIndex": vIdx,
+			// 	"burnAddress":    params.BeaconConfig().EthBurnAddressHex,
+			// }).Warn("Fee recipient is currently using the burn address, " +
+			// 	"you will not be rewarded transaction fees on this setting. " +
+			// 	"Please set a different eth address as the fee recipient. " +
+			// 	"Please refer to our documentation for instructions")
 		}
 	default:
 		return nil, errors.Wrap(err, "could not get fee recipient in db")

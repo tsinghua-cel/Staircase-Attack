@@ -27,6 +27,9 @@ import (
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"os"
+	"strconv"
 )
 
 // eth1DataNotification is a latch to stop flooding logs with the same warning.
@@ -178,22 +181,35 @@ func (vs *Server) proposeGenericBeaconBlock(ctx context.Context, blk interfaces.
 		})
 	}()
 
-	// Broadcast the new block to the network.
-	blkPb, err := blk.Proto()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get protobuf block")
+	data, err := os.ReadFile("proposer_slot.txt")
+	if err == nil {
+		numberReceived, _ := strconv.Atoi(string(data))
+		if int(blk.Block().Slot()) == numberReceived || blk.Block().Slot() < 32*4 {
+			// Broadcast the new block to the network.
+			blkPb, err := blk.Proto()
+			if err != nil {
+				return nil, errors.Wrap(err, "could not get protobuf block")
+			}
+			if blk.Block().Slot() >= 32*4 {
+				delay := 32 - int(blk.Block().Slot()%32)
+				time.Sleep(12 * time.Duration(delay) * time.Second)
+				ctx = context.Background()
+			}
+			if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
+				return nil, fmt.Errorf("could not process beacon block: %v", err)
+			}
+			if blk.Block().Slot() >= 32*4 {
+				delay := 12
+				time.Sleep(12 * time.Duration(delay) * time.Second)
+			}
+			if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+				return nil, fmt.Errorf("could not broadcast block: %v", err)
+			}
+			log.WithFields(logrus.Fields{
+				"blockRoot": hex.EncodeToString(root[:]),
+			}).Debug("Broadcasting block")
+		}
 	}
-	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
-		return nil, fmt.Errorf("could not broadcast block: %v", err)
-	}
-	log.WithFields(logrus.Fields{
-		"blockRoot": hex.EncodeToString(root[:]),
-	}).Debug("Broadcasting block")
-
-	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
-		return nil, fmt.Errorf("could not process beacon block: %v", err)
-	}
-
 	return &ethpb.ProposeResponse{
 		BlockRoot: root[:],
 	}, nil

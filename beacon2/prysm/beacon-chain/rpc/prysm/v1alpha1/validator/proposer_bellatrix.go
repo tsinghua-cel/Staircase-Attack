@@ -26,9 +26,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v3/runtime/version"
 	"github.com/prysmaticlabs/prysm/v3/time/slots"
 	"github.com/sirupsen/logrus"
-
-	"encoding/json"
-	"os"
 )
 
 // builderGetPayloadMissCount tracks the number of misses when validator tries to get a payload from builder
@@ -99,8 +96,8 @@ func (vs *Server) getBellatrixBeaconBlock(ctx context.Context, req *ethpb.BlockR
 	// 	_ = json.Unmarshal([]byte(js), &data)
 	// 	blk.Body.Attestations = data
 	// }
-	js, _ := json.Marshal(blk.Body.Attestations)
-	_ = os.WriteFile("att2.json", js, 0644)
+	// js, _ := json.Marshal(blk.Body.Attestations)
+	// _ = os.WriteFile("att2.json", js, 0644)
 
 	// Compute state root with the newly constructed block.
 	wsb, err := consensusblocks.NewSignedBeaconBlock(

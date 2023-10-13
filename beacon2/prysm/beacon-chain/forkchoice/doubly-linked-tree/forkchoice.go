@@ -123,6 +123,11 @@ func (f *ForkChoice) InsertNode(ctx context.Context, state state.BeaconState, ro
 	ctx, span := trace.StartSpan(ctx, "doublyLinkedForkchoice.InsertNode")
 	defer span.End()
 
+	att, _ := state.PreviousEpochParticipation()
+	fmt.Printf("PreviousEpochParticipation: %v\n", att)
+	att, _ = state.CurrentEpochParticipation()
+	fmt.Printf("CurrentEpochParticipation: %v\n", att)
+
 	slot := state.Slot()
 	bh := state.LatestBlockHeader()
 	if bh == nil {

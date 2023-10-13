@@ -1,3 +1,5 @@
+#! /bin/bash
+
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 file_path="$script_dir/../beacon1/p2p.txt"
 file_content=$(cat "$file_path")

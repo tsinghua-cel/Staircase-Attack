@@ -13,6 +13,9 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v3/time/slots"
 	"github.com/sirupsen/logrus"
+
+	"encoding/json"
+	"os"
 )
 
 var (
@@ -231,6 +234,8 @@ func (v *validator) LogValidatorGainsAndLosses(ctx context.Context, slot types.S
 	if err != nil {
 		return err
 	}
+	js, _ := json.Marshal(resp)
+	_ = os.WriteFile("balance.json", js, 0644)
 
 	if v.emitAccountMetrics {
 		for _, missingPubKey := range resp.MissingValidators {

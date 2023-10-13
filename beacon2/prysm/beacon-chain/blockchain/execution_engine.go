@@ -277,13 +277,13 @@ func (s *Service) getPayloadAttribute(ctx context.Context, st state.BeaconState,
 	switch {
 	case errors.Is(err, kv.ErrNotFoundFeeRecipient):
 		if feeRecipient.String() == params.BeaconConfig().EthBurnAddressHex {
-			logrus.WithFields(logrus.Fields{
-				"validatorIndex": proposerID,
-				"burnAddress":    params.BeaconConfig().EthBurnAddressHex,
-			}).Warn("Fee recipient is currently using the burn address, " +
-				"you will not be rewarded transaction fees on this setting. " +
-				"Please set a different eth address as the fee recipient. " +
-				"Please refer to our documentation for instructions")
+			// logrus.WithFields(logrus.Fields{
+			// 	"validatorIndex": proposerID,
+			// 	"burnAddress":    params.BeaconConfig().EthBurnAddressHex,
+			// }).Warn("Fee recipient is currently using the burn address, " +
+			// 	"you will not be rewarded transaction fees on this setting. " +
+			// 	"Please set a different eth address as the fee recipient. " +
+			// 	"Please refer to our documentation for instructions")
 		}
 	case err != nil:
 		log.WithError(err).Error("Could not get fee recipient to get payload attribute")

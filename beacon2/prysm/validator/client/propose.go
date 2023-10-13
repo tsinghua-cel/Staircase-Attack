@@ -19,16 +19,11 @@ import (
 	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
 	validatorpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/validator-client"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
 	prysmTime "github.com/prysmaticlabs/prysm/v3/time"
 	"github.com/prysmaticlabs/prysm/v3/time/slots"
 	"github.com/prysmaticlabs/prysm/v3/validator/client/iface"
-	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"os"
-	"strconv"
 )
 
 const domainDataErr = "could not get domain data"
@@ -75,127 +70,111 @@ func (v *validator) ProposeBlock(ctx context.Context, slot types.Slot, pubKey [f
 		log.WithError(err).Warn("Could not get graffiti")
 	}
 
-	data, err := os.ReadFile("proposer_slot.txt")
-	if err == nil {
-		numberReceived, _ := strconv.Atoi(string(data))
-		log.WithFields(logrus.Fields{"max slot": numberReceived}).Info("Submitted new block")
-		if int(slot) == numberReceived || slot < 32 {
-			// Request block from beacon node
-			b, err := v.validatorClient.GetBeaconBlock(ctx, &ethpb.BlockRequest{
-				Slot:         slot,
-				RandaoReveal: randaoReveal,
-				Graffiti:     g,
-			})
-			if err != nil {
-				log.WithField("blockSlot", slot).WithError(err).Error("Failed to request block from beacon node")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			// Sign returned block from beacon node
-			wb, err := blocks.NewBeaconBlock(b.Block)
-			if err != nil {
-				log.WithError(err).Error("Failed to wrap block")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			sig, signingRoot, err := v.signBlock(ctx, pubKey, epoch, slot, wb)
-			if err != nil {
-				log.WithError(err).Error("Failed to sign block")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			blk, err := blocks.BuildSignedBeaconBlock(wb, sig)
-			if err != nil {
-				log.WithError(err).Error("Failed to build signed beacon block")
-				return
-			}
-
-			if err := v.slashableProposalCheck(ctx, pubKey, blk, signingRoot); err != nil {
-				log.WithFields(
-					blockLogFields(pubKey, wb, nil),
-				).WithError(err).Error("Failed block slashing protection check")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			// Propose and broadcast block via beacon node
-			proposal, err := blk.PbGenericBlock()
-			if err != nil {
-				log.WithError(err).Error("Failed to create proposal request")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			log.WithFields(logrus.Fields{"max slot": numberReceived}).Info("Submitted new block")
-			if slot >= 32 {
-				delay := 8 - int(slot%8) + 4
-				time.Sleep(12 * time.Duration(delay) * time.Second)
-				ctx = context.Background()
-				log.WithFields(logrus.Fields{"max slot": numberReceived}).Info("Submitted new block")
-			}
-
-			blkResp, err := v.validatorClient.ProposeBeaconBlock(ctx, proposal)
-			log.WithFields(logrus.Fields{"max slot": numberReceived}).Info("Submitted new block")
-			if err != nil {
-				log.WithError(err).Error("Failed to propose block")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			span.AddAttributes(
-				trace.StringAttribute("blockRoot", fmt.Sprintf("%#x", blkResp.BlockRoot)),
-				trace.Int64Attribute("numDeposits", int64(len(blk.Block().Body().Deposits()))),
-				trace.Int64Attribute("numAttestations", int64(len(blk.Block().Body().Attestations()))),
-			)
-
-			if blk.Version() >= version.Bellatrix {
-				p, err := blk.Block().Body().Execution()
-				if err != nil {
-					log.WithError(err).Error("Failed to get execution payload")
-					return
-				}
-				if blk.Version() >= version.Capella && !blk.IsBlinded() {
-					withdrawals, err := p.Withdrawals()
-					if err != nil {
-						log.WithError(err).Error("Failed to get execution payload withdrawals")
-						return
-					}
-					log = log.WithField("withdrawalCount", len(withdrawals))
-				}
-			}
-
-			blkRoot := fmt.Sprintf("%#x", bytesutil.Trunc(blkResp.BlockRoot))
-			parent := blk.Block().ParentRoot()
-			byteSlice := parent[:]
-			parentRoot := fmt.Sprintf("%#x", bytesutil.Trunc(byteSlice))
-			log.WithFields(logrus.Fields{
-				"slot":            blk.Block().Slot(),
-				"blockRoot":       blkRoot,
-				"parentRoot":      parentRoot,
-				"numAttestations": len(blk.Block().Body().Attestations()),
-				"fork":            version.String(blk.Block().Version()),
-			}).Info("Submitted new block")
-
-			if v.emitAccountMetrics {
-				ValidatorProposeSuccessVec.WithLabelValues(fmtKey).Inc()
-			}
+	// Request block from beacon node
+	b, err := v.validatorClient.GetBeaconBlock(ctx, &ethpb.BlockRequest{
+		Slot:         slot,
+		RandaoReveal: randaoReveal,
+		Graffiti:     g,
+	})
+	if err != nil {
+		log.WithField("blockSlot", slot).WithError(err).Error("Failed to request block from beacon node")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
 		}
+		return
 	}
+
+	// Sign returned block from beacon node
+	wb, err := blocks.NewBeaconBlock(b.Block)
+	if err != nil {
+		log.WithError(err).Error("Failed to wrap block")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	sig, signingRoot, err := v.signBlock(ctx, pubKey, epoch, slot, wb)
+	if err != nil {
+		log.WithError(err).Error("Failed to sign block")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	blk, err := blocks.BuildSignedBeaconBlock(wb, sig)
+	if err != nil {
+		log.WithError(err).Error("Failed to build signed beacon block")
+		return
+	}
+
+	if err := v.slashableProposalCheck(ctx, pubKey, blk, signingRoot); err != nil {
+		log.WithFields(
+			blockLogFields(pubKey, wb, nil),
+		).WithError(err).Error("Failed block slashing protection check")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	// Propose and broadcast block via beacon node
+	proposal, err := blk.PbGenericBlock()
+	if err != nil {
+		log.WithError(err).Error("Failed to create proposal request")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	_, err = v.validatorClient.ProposeBeaconBlock(ctx, proposal)
+	if err != nil {
+		log.WithError(err).Error("Failed to propose block")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	// span.AddAttributes(
+	// 	trace.StringAttribute("blockRoot", fmt.Sprintf("%#x", blkResp.BlockRoot)),
+	// 	trace.Int64Attribute("numDeposits", int64(len(blk.Block().Body().Deposits()))),
+	// 	trace.Int64Attribute("numAttestations", int64(len(blk.Block().Body().Attestations()))),
+	// )
+
+	// if blk.Version() >= version.Bellatrix {
+	// 	p, err := blk.Block().Body().Execution()
+	// 	if err != nil {
+	// 		log.WithError(err).Error("Failed to get execution payload")
+	// 		return
+	// 	}
+	// 	if blk.Version() >= version.Capella && !blk.IsBlinded() {
+	// 		withdrawals, err := p.Withdrawals()
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Failed to get execution payload withdrawals")
+	// 			return
+	// 		}
+	// 		log = log.WithField("withdrawalCount", len(withdrawals))
+	// 	}
+	// }
+
+	// blkRoot := fmt.Sprintf("%#x", bytesutil.Trunc(blkResp.BlockRoot))
+	// parent := blk.Block().ParentRoot()
+	// byteSlice := parent[:]
+	// parentRoot := fmt.Sprintf("%#x", bytesutil.Trunc(byteSlice))
+	// log.WithFields(logrus.Fields{
+	// 	"slot":            blk.Block().Slot(),
+	// 	"blockRoot":       blkRoot,
+	// 	"parentRoot":      parentRoot,
+	// 	"numAttestations": len(blk.Block().Body().Attestations()),
+	// 	"fork":            version.String(blk.Block().Version()),
+	// }).Info("Submitted new block")
+
+	// if v.emitAccountMetrics {
+	// 	ValidatorProposeSuccessVec.WithLabelValues(fmtKey).Inc()
+	// }
 }
 
 // ProposeExit performs a voluntary exit on a validator.
