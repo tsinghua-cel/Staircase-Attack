@@ -38,11 +38,12 @@ def main():
                 print("111")
                 with open('uatt.json', 'w') as output_file:
                     output_file.write(output_json)
+                time.sleep(8)
+                if os.path.exists("uatt.json"):
+                    os.remove("uatt.json")
             if slot_count%32 == 0:
                 if os.path.exists("att.json"):
                     os.remove("att.json")
-                if os.path.exists("uatt.json"):
-                    os.remove("uatt.json")
                 time.sleep(12)
         else:
             time.sleep(1)

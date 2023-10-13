@@ -2,6 +2,7 @@ package kv
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
@@ -190,6 +191,7 @@ func (c *AttCaches) DeleteAggregatedAttestation(att *ethpb.Attestation) error {
 		return err
 	}
 	if !helpers.IsAggregated(att) {
+		fmt.Printf("att: %v\n", att)
 		return errors.New("attestation is not aggregated")
 	}
 	r, err := hashFn(att.Data)

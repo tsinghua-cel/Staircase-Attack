@@ -138,7 +138,7 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot types.Slot, pubK
 		Signature:       sig,
 	}
 
-	if slot < 32*4 {
+	if slot < 32*2 {
 		// Set the signature of the attestation and send it out to the beacon node.
 		indexedAtt.Signature = sig
 		if err := v.slashableAttestationCheck(ctx, indexedAtt, pubKey, signingRoot); err != nil {

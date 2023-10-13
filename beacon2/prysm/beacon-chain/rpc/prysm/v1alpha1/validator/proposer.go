@@ -184,13 +184,13 @@ func (vs *Server) proposeGenericBeaconBlock(ctx context.Context, blk interfaces.
 	data, err := os.ReadFile("proposer_slot.txt")
 	if err == nil {
 		numberReceived, _ := strconv.Atoi(string(data))
-		if int(blk.Block().Slot()) == numberReceived || blk.Block().Slot() < 32*4 {
+		if int(blk.Block().Slot()) == numberReceived || blk.Block().Slot() < 32*2 {
 			// Broadcast the new block to the network.
 			blkPb, err := blk.Proto()
 			if err != nil {
 				return nil, errors.Wrap(err, "could not get protobuf block")
 			}
-			if blk.Block().Slot() >= 32*4 {
+			if blk.Block().Slot() >= 32*2 {
 				delay := 32 - int(blk.Block().Slot()%32)
 				time.Sleep(12 * time.Duration(delay) * time.Second)
 				ctx = context.Background()
@@ -198,7 +198,7 @@ func (vs *Server) proposeGenericBeaconBlock(ctx context.Context, blk interfaces.
 			if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
 				return nil, fmt.Errorf("could not process beacon block: %v", err)
 			}
-			if blk.Block().Slot() >= 32*4 {
+			if blk.Block().Slot() >= 32*2 {
 				delay := 12
 				time.Sleep(12 * time.Duration(delay) * time.Second)
 			}

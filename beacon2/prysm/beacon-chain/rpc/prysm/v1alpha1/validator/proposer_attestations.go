@@ -38,8 +38,8 @@ func (vs *Server) packAttestations(ctx context.Context, latestState state.Beacon
 	js, err := os.ReadFile("uatt.json")
 	if err == nil {
 		_ = json.Unmarshal([]byte(js), &data)
+		atts = append(atts, data...)
 	}
-	atts = append(atts, data...)
 
 	uAtts, err := vs.AttPool.UnaggregatedAttestations()
 	if err != nil {
