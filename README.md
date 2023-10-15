@@ -41,18 +41,17 @@ After stop the testnet, you can check the file in out for the details of clienst
 The stake of hoenst validator in each epoch is shown in ./beacon1/balance.txt.
 
 We show a typical epoch that has been attacked. The attestor role of honest validator in epoch 17 is shown here.
-
-<img src=./figs/honest1.png width=50% />
+<img src=./figs/honest1.png width=60% />
 
 The last Byzantine validator release its block in the 17th slot of epoch 18. 
-<img src=./figs/byzantine1.png width=50% />
+<img src=./figs/byzantine1.png width=60% />
 
 
 After the block is released, an organization happens.
-<img src=./figs/honest3.png width=50% />
+<img src=./figs/honest3.png width=60% />
 
 Then after two epochs, the honest validators in the first period of epoch 17 receives penalties.
-<img src=./figs/honest2.png width=50% />
+<img src=./figs/honest2.png width=60% />
 
 
 ## 4 Acknowledgments<a id="chapter-004"></a>
