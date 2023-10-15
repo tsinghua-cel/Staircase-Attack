@@ -5,14 +5,16 @@ rm -rf genesis.ssz
 
 rm -rf beacon1/beacondata/
 rm -rf beacon1/validatordata/
-rm -rf beacon1/balance.txt
-rm -rf beacon1/balance.json
-rm -rf beacon1/p2p.txt
+rm -rf balance.txt
+rm -rf balance.json
+rm -rf p2p.txt
 
 rm -rf beacon2/beacondata/
 rm -rf beacon2/validatordata/
-rm -rf beacon2/genesistime.txt
-rm -rf beacon2/uatt.json
-rm -rf beacon2/duties.json
-rm -rf beacon2/att.json
-rm -rf beacon2/proposer_slot.txt
+rm -rf genesistime.txt
+rm -rf uatt.json
+rm -rf duties.json
+rm -rf att.json
+rm -rf proposer_slot.txt
+
+rm -rf out
