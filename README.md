@@ -80,9 +80,9 @@ root     2873970       1  0 15:09 pts/3    00:00:00 python3 ./beacon2/role_monit
 
 ## **3 Experimental results**<a id="chapter-003"></a>
 
-After stop the testnet, you can check the file in out for the details of clienst running.
+After stop the testnet, you can check the file in `out` for the details of clienst running.
 
-The stake of hoenst validator in each epoch is shown in ./beacon1/balance.txt.
+The stake of hoenst validator in each epoch is shown in `./beacon1/balance.txt`.
 
 We show a typical epoch that has been attacked. The attestor role of honest validator in epoch 17 is shown here.
 
