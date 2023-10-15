@@ -3,7 +3,6 @@
 ps -aux|grep geth| grep -v grep| awk '{print $2}'| xargs kill -9
 ps -aux|grep beacon1| grep -v grep| awk '{print $2}'| xargs kill -9
 ps -aux|grep beacon2| grep -v grep| awk '{print $2}'| xargs kill -9
-ps -aux|grep monitor| grep -v grep| awk '{print $2}'| xargs kill -9
 
 rm -rf gethdata/
 rm -rf genesis.ssz
