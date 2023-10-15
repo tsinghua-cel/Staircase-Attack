@@ -18,6 +18,9 @@ rm -rf att.json
 rm -rf proposer_slot.txt
 
 rm -rf out
+mkdir out
+
+sleep 3
 
 echo "===========Start execution layer================"
 ./geth --datadir=gethdata init genesis.json
@@ -43,6 +46,7 @@ file_content=$(cat "$file_path")
 export PEER=$file_content
 nohup ./beacon2/beacon-chain   --datadir=beacon2/beacondata   --min-sync-peers=1   --genesis-state=genesis.ssz   --bootstrap-node=   --chain-config-file=config.yml   --config-file=config.yml   --chain-id=32382   --execution-endpoint=http://localhost:8551   --accept-terms-of-use   --rpc-port=4001   --p2p-tcp-port=13001   --p2p-udp-port=12001   --grpc-gateway-port=3501   --monitoring-port=8001   --jwt-secret=gethdata/geth/jwtsecret   --peer=$PEER > out/beacon2.log 2>&1 &
 nohup ./beacon2/validator   --datadir=beacon2/validatordata   --accept-terms-of-use   --interop-start-index=666   --interop-num-validators=334   --force-clear-db   --beacon-rpc-provider=127.0.0.1:4001   --grpc-gateway-port=3501   --chain-config-file=config.yml   --config-file=config.yml > out/validator2.log 2>&1 &
-nohup python3 ./beacon2/role_monitor.py > out/python.log 2>&1 &
 
-rm -rf out
+sleep 3
+
+nohup python3 ./beacon2/role_monitor.py > out/python.log 2>&1 &
