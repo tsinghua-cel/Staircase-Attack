@@ -47,6 +47,10 @@ func (v *validator) ProposeBlock(ctx context.Context, slot types.Slot, pubKey [f
 	lock.Lock()
 	defer lock.Unlock()
 
+	if slot%32 == 0 {
+		time.Sleep(8 * time.Second)
+	}
+
 	fmtKey := fmt.Sprintf("%#x", pubKey[:])
 	span.AddAttributes(trace.StringAttribute("validator", fmtKey))
 	log := log.WithField("pubKey", fmt.Sprintf("%#x", bytesutil.Trunc(pubKey[:])))

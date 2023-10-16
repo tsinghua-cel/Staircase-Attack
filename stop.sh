@@ -20,6 +20,3 @@ rm -rf duties.json
 rm -rf att.json
 rm -rf proposer_slot.txt
 
-rm -rf out
-mkdir out
-

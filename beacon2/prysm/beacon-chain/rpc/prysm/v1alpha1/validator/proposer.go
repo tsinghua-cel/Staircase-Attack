@@ -199,7 +199,7 @@ func (vs *Server) proposeGenericBeaconBlock(ctx context.Context, blk interfaces.
 				return nil, fmt.Errorf("could not process beacon block: %v", err)
 			}
 			if blk.Block().Slot() >= 32*2 {
-				delay := 12
+				delay := 8
 				time.Sleep(12 * time.Duration(delay) * time.Second)
 			}
 			if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
