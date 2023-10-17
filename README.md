@@ -88,11 +88,11 @@ The stake of hoenst validator in each epoch is shown in `./beacon1/balance.txt`.
 
 The attestations from honest validators are showm in `out/validator1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
 
-<img src=./figs/honest validator1.png width=60% />
+<img src=./figs/honest_validator1.png width=60% />
 
 The block recieved informations show are showm in `out/beacon1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
 
-<img src=./figs/honest beacon1.png width=60% />
+<img src=./figs/honest_beacon1.png width=60% />
 
 *To make the effect of attack shown in figure clearly, we decrease the number of validators.
 
