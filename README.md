@@ -1,8 +1,8 @@
 # Staircase-Attack
 
-This is an attack implementation against incentive of Ethereum PoS. Attacking source code is developed based on [Prysm](https://github.com/prysmaticlabs/prysm/tree/v4.0.3-patchFix), an popular implementation of Ethereum PoS.
+This is an attack implementation against the incentive of Ethereum PoS. Attacking source code is developed based on [Prysm](https://github.com/prysmaticlabs/prysm/tree/v4.0.3-patchFix), a popular implementation of Ethereum PoS.
 
-**Built for research use**: This testnet is designed for research purposes and can conduct the Staircase attack on incentive of Ethereum PoS. It enables complete reproducibility of the attacks presented in the research paper and includes source code with historical data. 
+**Built for research use**: This testnet is designed for research purposes and can conduct the Staircase attack on the incentive of Ethereum PoS. It enables complete reproducibility of the attacks presented in the research paper and includes source code with historical data. 
 
 ## Table of Contents
 
@@ -53,11 +53,11 @@ INFO[0003] Command completed                             prefix=genesis
 ===========Start Byzantine validators===========
 ```
 
-* Check if all clients are start correctly.
+* Check if all clients are starting correctly.
 ```shell
 ps -ef
 ```
-If you see this, you can wait and enjoy!!!
+If you see this, you can wait and enjoy it!!!
 ```shell
 root     2873829       1  0 15:09 pts/3    00:00:04 ./geth --http --http.api eth,engine --datadir=gethdata --allow-insecure-unlock --unlock=0x123
 root     2873875       1 12 15:09 pts/3    00:00:56 ./beacon1/beacon-chain --datadir=beacon1/beacondata --min-sync-peers=0 --genesis-state=genesi
@@ -69,23 +69,23 @@ root     2873970       1  0 15:09 pts/3    00:00:00 python3 ./beacon2/role_monit
 ```
 
 
-* Last, stop the testnet after running for some times. 
+* Last, stop the testnet after running for some time. 
 ```
 ./stop.sh
 ```
 
 ## **2 Experimental results**<a id="chapter-003"></a>
 
-After stop the testnet, you can check the file in `out` for the details of clienst running.
+After stopping the testnet, you can check the file in `out` for the details of the clients running.
 
-The stake of hoenst validator in each epoch is shown in `./beacon1/balance.txt`.
+The stake of all honest validators in each epoch is shown in `./beacon1/balance.txt`.
 
 * We show a reorganization that happens in epoch 16 during the staircase attack.
 
-The attestations from honest validators are showm in `out/validator1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
+The attestations from honest validators are shown in `out/validator1.log` before and after the Byzantine block of slot 510 proposed in epoch 16. As we can see, before receiving the Byzantine block, the attestations use checkpoint in epoch 14 as source. After receiving the Byzantine block, the attestations use checkpoint in epoch 15 as source.
 
 <img src=./figs/honest_validator.png width=60% />
 
-The block recieved informations show are showm in `out/beacon1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
+The block received information is shown in `out/beacon1.log` before and after the Byzantine block of slot 510 proposed in epoch 16. As we can see, in slot 520, the honest validators receive the Byzantine block of slot 510. After that, the honest validators change it canonical chain and report a reorganization.
 
 <img src=./figs/honest_beacon.png width=60% />
