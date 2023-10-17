@@ -94,25 +94,6 @@ The block recieved informations show are showm in `out/beacon1.log` before and a
 
 <img src=./figs/honest_beacon1.png width=60% />
 
-*To make the effect of attack shown in figure clearly, we decrease the number of validators.
-
-The attestor role of honest validator in epoch 17 is shown here.
-
-<img src=./figs/honest1.png width=60% />
-
-The last Byzantine validator release its block in the 17th slot of epoch 18. 
-
-<img src=./figs/byzantine1.png width=60% />
-
-
-After the block is released, an organization happens.
-
-<img src=./figs/honest3.png width=60% />
-
-Then after two epochs, the honest validators in the first period of epoch 17 receives penalties.
-
-<img src=./figs/honest2.png width=60% />
-
 
 ## 4 Acknowledgments<a id="chapter-004"></a>
 Attacking source code is developed based on [Prysm](https://github.com/prysmaticlabs/prysm/tree/v4.0.3-patchFix), an popular implementation of Ethereum PoS.
