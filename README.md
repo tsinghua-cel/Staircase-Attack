@@ -80,7 +80,7 @@ After stop the testnet, you can check the file in `out` for the details of clien
 
 The stake of hoenst validator in each epoch is shown in `./beacon1/balance.txt`.
 
-*We show a reorganization that happens in epoch 16 during the staircase attack.
+* We show a reorganization that happens in epoch 16 during the staircase attack.
 
 The attestations from honest validators are showm in `out/validator1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
 
