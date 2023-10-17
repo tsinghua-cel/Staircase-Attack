@@ -1,21 +1,17 @@
 # Staircase-Attack
 
-This is an attack implementation against incentive of Ethereum PoS.
-
-## Table of Contents
-
-1. [Description](#chapter-001)<br>
-2. [Run the Testnet Step by Step](#chapter-002)<br>
-3. [Experimental Results](#chapter-003)<br>
-4. [Acknowledgments](#chapter-004)<br>
-
-
-## **1 Description**<a id="chapter-001"></a>
+This is an attack implementation against incentive of Ethereum PoS. Attacking source code is developed based on [Prysm](https://github.com/prysmaticlabs/prysm/tree/v4.0.3-patchFix), an popular implementation of Ethereum PoS.
 
 **Built for research use**: This testnet is designed for research purposes and can conduct the Staircase attack on incentive of Ethereum PoS. It enables complete reproducibility of the attacks presented in the research paper and includes source code with historical data. 
 
+## Table of Contents
 
-## **2 Run the Testnet Step by Step**<a id="chapter-002"></a>
+1. [Run the Testnet Step by Step](#chapter-002)<br>
+2. [Experimental Results](#chapter-003)<br>
+
+
+
+## **1 Run the Testnet Step by Step**<a id="chapter-002"></a>
 We establish 1000 validators for testing. Among them, the honest validators run the code in folder beacon1 while the Byzantine validators run the code in folder beacon2.
 
 * First, clone the repository.
@@ -78,7 +74,7 @@ root     2873970       1  0 15:09 pts/3    00:00:00 python3 ./beacon2/role_monit
 ./stop.sh
 ```
 
-## **3 Experimental results**<a id="chapter-003"></a>
+## **2 Experimental results**<a id="chapter-003"></a>
 
 After stop the testnet, you can check the file in `out` for the details of clienst running.
 
@@ -93,7 +89,3 @@ The attestations from honest validators are showm in `out/validator1.log` before
 The block recieved informations show are showm in `out/beacon1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
 
 <img src=./figs/honest_beacon.png width=60% />
-
-
-## 4 Acknowledgments<a id="chapter-004"></a>
-Attacking source code is developed based on [Prysm](https://github.com/prysmaticlabs/prysm/tree/v4.0.3-patchFix), an popular implementation of Ethereum PoS.
