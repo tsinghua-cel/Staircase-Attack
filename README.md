@@ -84,22 +84,15 @@ After stop the testnet, you can check the file in `out` for the details of clien
 
 The stake of hoenst validator in each epoch is shown in `./beacon1/balance.txt`.
 
-We show a typical epoch that has been attacked. To make the effect of attack shown in figure clearly, we decrease the number of validators. The attestor role of honest validator in epoch 17 is shown here.
+*We show a reorganization that happens in epoch 16 during the staircase attack.
 
-<img src=./figs/honest1.png width=60% />
+The attestations from honest validators are showm in `out/validator1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
 
-The last Byzantine validator release its block in the 17th slot of epoch 18. 
+<img src=./figs/honest_validator1.png width=60% />
 
-<img src=./figs/byzantine1.png width=60% />
+The block recieved informations show are showm in `out/beacon1.log` before and after the Byzantine block of slot 510 proposed in epoch 16.
 
-
-After the block is released, an organization happens.
-
-<img src=./figs/honest3.png width=60% />
-
-Then after two epochs, the honest validators in the first period of epoch 17 receives penalties.
-
-<img src=./figs/honest2.png width=60% />
+<img src=./figs/honest_beacon1.png width=60% />
 
 
 ## 4 Acknowledgments<a id="chapter-004"></a>
