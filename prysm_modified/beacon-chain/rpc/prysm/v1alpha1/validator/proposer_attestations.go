@@ -31,17 +31,17 @@ func (vs *Server) packAttestations(ctx context.Context, latestState state.Beacon
 		return nil, errors.Wrap(err, "could not filter attestations")
 	}
 
-	uAtts, err := vs.AttPool.UnaggregatedAttestations()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get unaggregated attestations")
-	}
-
 	data := vs.AttPool.AggregatedAttestations()
 	js, err := os.ReadFile("uatt.json")
 	if err == nil {
 		_ = json.Unmarshal([]byte(js), &data)
-		uAtts = data
 	}
+
+	uAtts, err := vs.AttPool.UnaggregatedAttestations()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get unaggregated attestations")
+	}
+	uAtts = append(uAtts, data...)
 
 	uAtts, err = vs.validateAndDeleteAttsInPool(ctx, latestState, uAtts)
 	if err != nil {

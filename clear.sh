@@ -6,4 +6,8 @@ rm -rf beacondata2/
 rm -rf validatordata/
 rm -rf validatordata2/
 
-rm genesistime.txt p2p.txt proposer_slot.txt uatt.json
+rm -rf genesistime.txt
+rm -rf p2p.txt
+rm -rf proposer_slot.txt
+rm -rf att.json
+

@@ -4,7 +4,7 @@
    testnet \
    generate-genesis \
    --fork=capella \
-   --num-validators=16 \
+   --num-validators=1500 \
    --genesis-time-delay=15 \
    --output-ssz=genesis.ssz \
    --chain-config-file=config.yml \

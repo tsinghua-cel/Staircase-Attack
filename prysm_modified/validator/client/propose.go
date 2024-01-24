@@ -4,8 +4,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -26,7 +24,6 @@ import (
 	prysmTime "github.com/prysmaticlabs/prysm/v4/time"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"github.com/prysmaticlabs/prysm/v4/validator/client/iface"
-	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 )
 
@@ -74,168 +71,157 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		log.WithError(err).Warn("Could not get graffiti")
 	}
 
-	if slot%8 == 0 {
+	// Request block from beacon node
+	b, err := v.validatorClient.GetBeaconBlock(ctx, &ethpb.BlockRequest{
+		Slot:         slot,
+		RandaoReveal: randaoReveal,
+		Graffiti:     g,
+	})
+	if err != nil {
+		log.WithField("blockSlot", slot).WithError(err).Error("Failed to request block from beacon node")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	// Sign returned block from beacon node
+	wb, err := blocks.NewBeaconBlock(b.Block)
+	if err != nil {
+		log.WithError(err).Error("Failed to wrap block")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	sig, signingRoot, err := v.signBlock(ctx, pubKey, epoch, slot, wb)
+	if err != nil {
+		log.WithError(err).Error("Failed to sign block")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	blk, err := blocks.BuildSignedBeaconBlock(wb, sig)
+	if err != nil {
+		log.WithError(err).Error("Failed to build signed beacon block")
+		return
+	}
+
+	if err := v.slashableProposalCheck(ctx, pubKey, blk, signingRoot); err != nil {
+		log.WithFields(
+			blockLogFields(pubKey, wb, nil),
+		).WithError(err).Error("Failed block slashing protection check")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		return
+	}
+
+	var genericSignedBlock *ethpb.GenericSignedBeaconBlock
+	if blk.Version() >= version.Deneb && !blk.IsBlinded() {
+		denebBlock, err := blk.PbDenebBlock()
+		if err != nil {
+			log.WithError(err).Error("Failed to get deneb block")
+			return
+		}
+		genericSignedBlock = &ethpb.GenericSignedBeaconBlock{
+			Block: &ethpb.GenericSignedBeaconBlock_Deneb{
+				Deneb: &ethpb.SignedBeaconBlockContentsDeneb{
+					Block:     denebBlock,
+					KzgProofs: b.GetDeneb().KzgProofs,
+					Blobs:     b.GetDeneb().Blobs,
+				},
+			},
+		}
+	} else {
+		genericSignedBlock, err = blk.PbGenericBlock()
+		if err != nil {
+			log.WithError(err).Error("Failed to create proposal request")
+			if v.emitAccountMetrics {
+				ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+			}
+			return
+		}
+	}
+
+	if int(slot)%32 == 0 {
 		time.Sleep(8 * time.Second)
 		ctx = context.Background()
 	}
 
-	data, err := os.ReadFile("proposer_slot.txt")
-	if err == nil {
-		numberReceived, _ := strconv.Atoi(string(data))
-		if int(slot) == numberReceived {
-
-			// Request block from beacon node
-			b, err := v.validatorClient.GetBeaconBlock(ctx, &ethpb.BlockRequest{
-				Slot:         slot,
-				RandaoReveal: randaoReveal,
-				Graffiti:     g,
-			})
-			if err != nil {
-				log.WithField("blockSlot", slot).WithError(err).Error("Failed to request block from beacon node")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			// Sign returned block from beacon node
-			wb, err := blocks.NewBeaconBlock(b.Block)
-			if err != nil {
-				log.WithError(err).Error("Failed to wrap block")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			sig, signingRoot, err := v.signBlock(ctx, pubKey, epoch, slot, wb)
-			if err != nil {
-				log.WithError(err).Error("Failed to sign block")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			blk, err := blocks.BuildSignedBeaconBlock(wb, sig)
-			if err != nil {
-				log.WithError(err).Error("Failed to build signed beacon block")
-				return
-			}
-
-			if err := v.slashableProposalCheck(ctx, pubKey, blk, signingRoot); err != nil {
-				log.WithFields(
-					blockLogFields(pubKey, wb, nil),
-				).WithError(err).Error("Failed block slashing protection check")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			var genericSignedBlock *ethpb.GenericSignedBeaconBlock
-			if blk.Version() >= version.Deneb && !blk.IsBlinded() {
-				denebBlock, err := blk.PbDenebBlock()
-				if err != nil {
-					log.WithError(err).Error("Failed to get deneb block")
-					return
-				}
-				genericSignedBlock = &ethpb.GenericSignedBeaconBlock{
-					Block: &ethpb.GenericSignedBeaconBlock_Deneb{
-						Deneb: &ethpb.SignedBeaconBlockContentsDeneb{
-							Block:     denebBlock,
-							KzgProofs: b.GetDeneb().KzgProofs,
-							Blobs:     b.GetDeneb().Blobs,
-						},
-					},
-				}
-			} else {
-				genericSignedBlock, err = blk.PbGenericBlock()
-				if err != nil {
-					log.WithError(err).Error("Failed to create proposal request")
-					if v.emitAccountMetrics {
-						ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-					}
-					return
-				}
-			}
-
-			delay := 8 - int(slot%8) + 4
-			time.Sleep(12 * time.Duration(delay) * time.Second)
-			ctx = context.Background()
-
-			blkResp, err := v.validatorClient.ProposeBeaconBlock(ctx, genericSignedBlock)
-			if err != nil {
-				log.WithField("blockSlot", slot).WithError(err).Error("Failed to propose block")
-				if v.emitAccountMetrics {
-					ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
-				}
-				return
-			}
-
-			span.AddAttributes(
-				trace.StringAttribute("blockRoot", fmt.Sprintf("%#x", blkResp.BlockRoot)),
-				trace.Int64Attribute("numDeposits", int64(len(blk.Block().Body().Deposits()))),
-				trace.Int64Attribute("numAttestations", int64(len(blk.Block().Body().Attestations()))),
-			)
-
-			if blk.Version() >= version.Bellatrix {
-				p, err := blk.Block().Body().Execution()
-				if err != nil {
-					log.WithError(err).Error("Failed to get execution payload")
-					return
-				}
-				log = log.WithFields(logrus.Fields{
-					"payloadHash": fmt.Sprintf("%#x", bytesutil.Trunc(p.BlockHash())),
-					"parentHash":  fmt.Sprintf("%#x", bytesutil.Trunc(p.ParentHash())),
-					"blockNumber": p.BlockNumber,
-				})
-				if !blk.IsBlinded() {
-					txs, err := p.Transactions()
-					if err != nil {
-						log.WithError(err).Error("Failed to get execution payload transactions")
-						return
-					}
-					log = log.WithField("txCount", len(txs))
-				}
-				if p.GasLimit() != 0 {
-					log = log.WithField("gasUtilized", float64(p.GasUsed())/float64(p.GasLimit()))
-				}
-				if blk.Version() >= version.Capella && !blk.IsBlinded() {
-					withdrawals, err := p.Withdrawals()
-					if err != nil {
-						log.WithError(err).Error("Failed to get execution payload withdrawals")
-						return
-					}
-					log = log.WithField("withdrawalCount", len(withdrawals))
-				}
-				if blk.Version() >= version.Deneb {
-					kzgs, err := blk.Block().Body().BlobKzgCommitments()
-					if err != nil {
-						log.WithError(err).Error("Failed to get blob KZG commitments")
-						return
-					} else if len(kzgs) != 0 {
-						log = log.WithField("kzgCommitmentCount", len(kzgs))
-					}
-				}
-			}
-
-			blkRoot := fmt.Sprintf("%#x", bytesutil.Trunc(blkResp.BlockRoot))
-			graffiti := blk.Block().Body().Graffiti()
-			log.WithFields(logrus.Fields{
-				"slot":            blk.Block().Slot(),
-				"blockRoot":       blkRoot,
-				"numAttestations": len(blk.Block().Body().Attestations()),
-				"numDeposits":     len(blk.Block().Body().Deposits()),
-				"graffiti":        string(graffiti[:]),
-				"fork":            version.String(blk.Block().Version()),
-			}).Info("Submitted new block")
-
-			if v.emitAccountMetrics {
-				ValidatorProposeSuccessVec.WithLabelValues(fmtKey).Inc()
-			}
+	_, err = v.validatorClient.ProposeBeaconBlock(ctx, genericSignedBlock)
+	if err != nil {
+		log.WithField("blockSlot", slot).WithError(err).Error("Failed to propose block")
+		if v.emitAccountMetrics {
+			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
 		}
+		return
 	}
+
+	// span.AddAttributes(
+	// 	trace.StringAttribute("blockRoot", fmt.Sprintf("%#x", blkResp.BlockRoot)),
+	// 	trace.Int64Attribute("numDeposits", int64(len(blk.Block().Body().Deposits()))),
+	// 	trace.Int64Attribute("numAttestations", int64(len(blk.Block().Body().Attestations()))),
+	// )
+
+	// if blk.Version() >= version.Bellatrix {
+	// 	p, err := blk.Block().Body().Execution()
+	// 	if err != nil {
+	// 		log.WithError(err).Error("Failed to get execution payload")
+	// 		return
+	// 	}
+	// 	log = log.WithFields(logrus.Fields{
+	// 		"payloadHash": fmt.Sprintf("%#x", bytesutil.Trunc(p.BlockHash())),
+	// 		"parentHash":  fmt.Sprintf("%#x", bytesutil.Trunc(p.ParentHash())),
+	// 		"blockNumber": p.BlockNumber,
+	// 	})
+	// 	if !blk.IsBlinded() {
+	// 		txs, err := p.Transactions()
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Failed to get execution payload transactions")
+	// 			return
+	// 		}
+	// 		log = log.WithField("txCount", len(txs))
+	// 	}
+	// 	if p.GasLimit() != 0 {
+	// 		log = log.WithField("gasUtilized", float64(p.GasUsed())/float64(p.GasLimit()))
+	// 	}
+	// 	if blk.Version() >= version.Capella && !blk.IsBlinded() {
+	// 		withdrawals, err := p.Withdrawals()
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Failed to get execution payload withdrawals")
+	// 			return
+	// 		}
+	// 		log = log.WithField("withdrawalCount", len(withdrawals))
+	// 	}
+	// 	if blk.Version() >= version.Deneb {
+	// 		kzgs, err := blk.Block().Body().BlobKzgCommitments()
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Failed to get blob KZG commitments")
+	// 			return
+	// 		} else if len(kzgs) != 0 {
+	// 			log = log.WithField("kzgCommitmentCount", len(kzgs))
+	// 		}
+	// 	}
+	// }
+
+	// blkRoot := fmt.Sprintf("%#x", bytesutil.Trunc(blkResp.BlockRoot))
+	// graffiti := blk.Block().Body().Graffiti()
+	// log.WithFields(logrus.Fields{
+	// 	"slot":            blk.Block().Slot(),
+	// 	"blockRoot":       blkRoot,
+	// 	"numAttestations": len(blk.Block().Body().Attestations()),
+	// 	"numDeposits":     len(blk.Block().Body().Deposits()),
+	// 	"graffiti":        string(graffiti[:]),
+	// 	"fork":            version.String(blk.Block().Version()),
+	// }).Info("Submitted new block")
+
+	// if v.emitAccountMetrics {
+	// 	ValidatorProposeSuccessVec.WithLabelValues(fmtKey).Inc()
+	// }
 }
 
 // ProposeExit performs a voluntary exit on a validator.

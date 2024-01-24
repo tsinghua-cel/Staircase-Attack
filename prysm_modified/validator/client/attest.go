@@ -136,7 +136,7 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		Signature:       sig,
 	}
 
-	if slot < 0 {
+	if slot < 32 {
 		// Set the signature of the attestation and send it out to the beacon node.
 		indexedAtt.Signature = sig
 		if err := v.slashableAttestationCheck(ctx, indexedAtt, pubKey, signingRoot); err != nil {
@@ -182,7 +182,20 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		}
 	} else {
 		js, _ := json.Marshal(attestation)
-		_ = os.WriteFile("att.json", js, 0644)
+		file, err := os.OpenFile("att.json", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Printf("open error\n")
+		}
+		defer file.Close()
+		file.Write(js)
+		file.WriteString("\n")
+		// log.WithFields(logrus.Fields{
+		// 	"Slot":        int64(slot),
+		// 	"SourceEpoch": int64(data.Source.Epoch),
+		// 	"SourceRoot":  fmt.Sprintf("%#x", bytesutil.Trunc(data.Source.Root)),
+		// 	"TargetEpoch": int64(data.Target.Epoch),
+		// 	"TargetRoot":  fmt.Sprintf("%#x", bytesutil.Trunc(data.Target.Root)),
+		// }).Info("Submitted new attestations")
 	}
 }
 

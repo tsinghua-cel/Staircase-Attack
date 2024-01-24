@@ -2,7 +2,10 @@ package validator
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -233,15 +236,35 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	var wg sync.WaitGroup
 	errChan := make(chan error, 1)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := vs.broadcastReceiveBlock(ctx, block, root); err != nil {
-			errChan <- errors.Wrap(err, "broadcast/receive block failed")
-			return
+	data, err := os.ReadFile("proposer_slot.txt")
+	if err == nil {
+		numberReceived, _ := strconv.Atoi(string(data))
+		if int(block.Block().Slot()) == numberReceived || block.Block().Slot() < 32 || int(block.Block().Slot())%32 == 0 {
+			// Broadcast the new block to the network.
+			blkPb, err := block.Proto()
+			if err != nil {
+				return nil, errors.Wrap(err, "could not get protobuf block")
+			}
+			if int(block.Block().Slot()) == numberReceived && block.Block().Slot() > 32 {
+				delay := 32 - int(block.Block().Slot()%32)
+				time.Sleep(12 * time.Duration(delay) * time.Second)
+				ctx = context.Background()
+			}
+			if err := vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil); err != nil {
+				return nil, fmt.Errorf("could not process beacon block: %v", err)
+			}
+			if int(block.Block().Slot()) == numberReceived && block.Block().Slot() > 32 {
+				delay := 8
+				time.Sleep(12 * time.Duration(delay) * time.Second)
+			}
+			if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+				return nil, fmt.Errorf("could not broadcast block: %v", err)
+			}
+			log.WithFields(logrus.Fields{
+				"blockRoot": hex.EncodeToString(root[:]),
+			}).Debug("Broadcasting block")
 		}
-		errChan <- nil
-	}()
+	}
 
 	if err := vs.broadcastAndReceiveBlobs(ctx, sidecars, root); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive blobs: %v", err)

@@ -227,6 +227,7 @@ func initializeValidatorAndGetHeadSlot(ctx context.Context, v iface.Validator) (
 }
 
 func performRoles(slotCtx context.Context, allRoles map[[48]byte][]iface.ValidatorRole, v iface.Validator, slot primitives.Slot, wg *sync.WaitGroup, span *trace.Span) {
+	var fileMutex sync.Mutex
 	for pubKey, roles := range allRoles {
 		wg.Add(len(roles))
 		for _, role := range roles {
@@ -234,6 +235,8 @@ func performRoles(slotCtx context.Context, allRoles map[[48]byte][]iface.Validat
 				defer wg.Done()
 				switch role {
 				case iface.RoleAttester:
+					fileMutex.Lock()
+					defer fileMutex.Unlock()
 					v.SubmitAttestation(slotCtx, slot, pubKey)
 				case iface.RoleProposer:
 					v.ProposeBlock(slotCtx, slot, pubKey)
