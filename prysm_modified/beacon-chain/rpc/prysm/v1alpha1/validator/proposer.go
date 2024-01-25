@@ -2,7 +2,6 @@ package validator
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -233,47 +232,53 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		return nil, status.Errorf(codes.Internal, "Could not hash tree root: %v", err)
 	}
 
-	var wg sync.WaitGroup
-	errChan := make(chan error, 1)
+	// var wg sync.WaitGroup
+	// errChan := make(chan error, 1)
 
-	data, err := os.ReadFile("proposer_slot.txt")
-	if err == nil {
-		numberReceived, _ := strconv.Atoi(string(data))
-		if int(block.Block().Slot()) == numberReceived || block.Block().Slot() < 32 || int(block.Block().Slot())%32 == 0 {
-			// Broadcast the new block to the network.
-			blkPb, err := block.Proto()
-			if err != nil {
-				return nil, errors.Wrap(err, "could not get protobuf block")
-			}
-			if int(block.Block().Slot()) == numberReceived && block.Block().Slot() > 32 {
-				delay := 32 - int(block.Block().Slot()%32)
-				time.Sleep(12 * time.Duration(delay) * time.Second)
-				ctx = context.Background()
-			}
-			if err := vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil); err != nil {
-				return nil, fmt.Errorf("could not process beacon block: %v", err)
-			}
-			if int(block.Block().Slot()) == numberReceived && block.Block().Slot() > 32 {
-				delay := 8
-				time.Sleep(12 * time.Duration(delay) * time.Second)
-			}
-			if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
-				return nil, fmt.Errorf("could not broadcast block: %v", err)
-			}
-			log.WithFields(logrus.Fields{
-				"blockRoot": hex.EncodeToString(root[:]),
-			}).Debug("Broadcasting block")
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	if err := vs.broadcastReceiveBlock(ctx, block, root); err != nil {
+	// 		errChan <- errors.Wrap(err, "broadcast/receive block failed")
+	// 		return
+	// 	}
+	// 	errChan <- nil
+	// }()
+
+	data, _ := os.ReadFile("proposer_slot.txt")
+	numberReceived, _ := strconv.Atoi(string(data))
+	if int(block.Block().Slot()) == numberReceived || block.Block().Slot() < 32 || int(block.Block().Slot())%32 == 0 {
+		protoBlock, err := block.Proto()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not broadcast block: %v", err)
 		}
+		if int(block.Block().Slot()) == numberReceived && block.Block().Slot() > 32 {
+			delay := 32 - int(block.Block().Slot()%32)
+			time.Sleep(12 * time.Duration(delay) * time.Second)
+			ctx = context.Background()
+		}
+		vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil)
+		if int(block.Block().Slot()) == numberReceived && block.Block().Slot() > 32 {
+			delay := 14
+			time.Sleep(12 * time.Duration(delay) * time.Second)
+		}
+		if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not broadcast block: %v", err)
+		}
+		vs.BlockNotifier.BlockFeed().Send(&feed.Event{
+			Type: blockfeed.ReceivedBlock,
+			Data: &blockfeed.ReceivedBlockData{SignedBlock: block},
+		})
 	}
 
 	if err := vs.broadcastAndReceiveBlobs(ctx, sidecars, root); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive blobs: %v", err)
 	}
 
-	wg.Wait()
-	if err := <-errChan; err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive block: %v", err)
-	}
+	// wg.Wait()
+	// if err := <-errChan; err != nil {
+	// 	return nil, status.Errorf(codes.Internal, "Could not broadcast/receive block: %v", err)
+	// }
 
 	return &ethpb.ProposeResponse{BlockRoot: root[:]}, nil
 }
@@ -320,18 +325,8 @@ func (vs *Server) handleUnblindedBlock(block interfaces.SignedBeaconBlock, req *
 
 // broadcastReceiveBlock broadcasts a block and handles its reception.
 func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.SignedBeaconBlock, root [32]byte) error {
-	protoBlock, err := block.Proto()
-	if err != nil {
-		return errors.Wrap(err, "protobuf conversion failed")
-	}
-	if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
-		return errors.Wrap(err, "broadcast failed")
-	}
-	vs.BlockNotifier.BlockFeed().Send(&feed.Event{
-		Type: blockfeed.ReceivedBlock,
-		Data: &blockfeed.ReceivedBlockData{SignedBlock: block},
-	})
-	return vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil)
+
+	return nil
 }
 
 // broadcastAndReceiveBlobs handles the broadcasting and reception of blob sidecars.
