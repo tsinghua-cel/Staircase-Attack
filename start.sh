@@ -58,7 +58,7 @@ nohup ./geth \
    --nodiscover \
    --syncmode=full > out/execution.log 2>&1 &
 
-sleep 3
+sleep 10
 
 echo "===========Start honest validators=============="
 nohup ./beacon-chain \
@@ -77,12 +77,11 @@ nohup ./beacon-chain \
    --jwt-secret=jwtsecret \
    --suggested-fee-recipient=0x123463a4b065722e99115d6c222f267d9cabb524 \
    --minimum-peers-per-subnet=0 \
-   --enable-debug-rpc-endpoints > out/beacon1.log 2>&1 &
-nohup ./validator   --datadir=validatordata   --accept-terms-of-use   --interop-num-validators=8   --interop-start-index=0   --force-clear-db   --chain-config-file=config.yml   --config-file=config.yml > out/validator1.log 2>&1 &
-nohup python3 ./beacon1/balance_monitor.py > out/python.log 2>&1 &
+   --enable-debug-rpc-endpoints > out/beacon_hon.log 2>&1 &
+nohup ./validator   --datadir=validatordata   --accept-terms-of-use   --interop-num-validators=8   --interop-start-index=0   --force-clear-db   --chain-config-file=config.yml   --config-file=config.yml > out/validator_hon.log 2>&1 &
 
 
-sleep 3
+sleep 10
 
 echo "===========Start Byzantine validators==========="
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -112,9 +111,9 @@ nohup ./beacon-chain_adv \
    --suggested-fee-recipient=0x123463a4b065722e99115d6c222f267d9cabb524 \
    --minimum-peers-per-subnet=0 \
    --enable-debug-rpc-endpoints \
-   --peer=$PEER > out/beacon2.log 2>&1 &
-nohup ./validator_adv   --datadir=validatordata2   --accept-terms-of-use   --interop-start-index=8   --interop-num-validators=8   --force-clear-db   --beacon-rpc-provider=127.0.0.1:4001   --grpc-gateway-port=3501   --chain-config-file=config.yml   --config-file=config.yml > out/validator2.log 2>&1 &
+   --peer=$PEER > out/beacon_adv.log 2>&1 &
+nohup ./validator_adv   --datadir=validatordata2   --accept-terms-of-use   --interop-start-index=8   --interop-num-validators=8   --force-clear-db   --beacon-rpc-provider=127.0.0.1:4001   --grpc-gateway-port=3501   --chain-config-file=config.yml   --config-file=config.yml > out/validator_adv.log 2>&1 &
 
-sleep 3
+sleep 10
 
 nohup python3 execution.py > out/python.log 2>&1 &
