@@ -10,21 +10,21 @@
 
 <div>	
     <img src="./figs/block-31.png"
-         style=100%/>
+         width=60% />
     <br>
     <font size=3> Figure 1: Block 31 (root 0xbb) is proposed in slot 31.</font>
 </div>
 
 <div>
     <img src="./figs/block-32.png"
-         style=100%/>
+         width=60% />
     <br>
     <font size=3> Figure 2: Block 32 (root 0xcc) is withheld by a Byzantine validator and delayed for 8 seconds.</font>
 </div>
 
 <div>	
     <img src="./figs/warm-up-attack.png"
-         style=100%/>
+         width=60% />
     <br>
     <font size=3> Figure 3: Attestations from honest validators in slot 32 to 35. As block 32 is delayed, the target of attestations in slot 32 is set as block 31 (the first INFO). After block 32 is released, the attestations from honest validators will have their target as block 32 (2nd to the 5th INFO).  </font>
 </div>
@@ -33,14 +33,14 @@
 
 <div>	
     <img src="./figs/reorg-occurred.png"
-         style=100%/>
+         width=60% />
     <br>
     <font size=3> Figure 4: Re-produced results using the Capella version. </font>
 </div>
 
 <div>	
     <img src="./figs/attestations.png"
-         style=100%/>
+         width=60% />
     <br>
     <font size=3> Figure 5: Attestations from honest validators before and after reorganization. It can be seen that the fork is Capella.  </font>
 </div>
