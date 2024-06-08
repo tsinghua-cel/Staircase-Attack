@@ -23,6 +23,6 @@ fi
 ./scripts/genesis.sh || exit 1
 
 # start docker compose
-docker compose -f $CASEFILE up -d && echo "$CASEFILE" > .case
+cp $CASEFILE docker-compose.yml &&  docker compose -f docker-compose.yml up -d  || echo "start testcase failed"
 
 echo "start testcase success"

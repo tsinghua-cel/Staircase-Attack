@@ -1,3 +1,2 @@
 #!/bin/bash
-case=`cat .case`
-docker compose -f "$case" down && rm .case
+docker compose -f docker-compose.yml down 
