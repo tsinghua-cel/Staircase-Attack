@@ -1,4 +1,5 @@
 #!/bin/bash
+
 echo "build ethtools image at $PWD"
 docker build -t ethnettools -f dockerfile/ethtools.Dockerfile .
 docker run -it --rm -v "${PWD}/ethnet/config:/root/config" --name generate --entrypoint /usr/bin/prysmctl ethnettools \
