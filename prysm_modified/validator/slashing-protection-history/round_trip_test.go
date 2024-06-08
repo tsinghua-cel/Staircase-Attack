@@ -207,14 +207,10 @@ func TestImportInterchangeData_OK(t *testing.T) {
 
 		wantedAttsByRoot := make(map[[32]byte]*kv.AttestationRecord)
 		for _, att := range attestingHistory[i] {
-			var signingRoot [32]byte
-			copy(signingRoot[:], att.SigningRoot)
-			wantedAttsByRoot[signingRoot] = att
+			wantedAttsByRoot[att.SigningRoot] = att
 		}
 		for _, att := range receivedAttestingHistory {
-			var signingRoot [32]byte
-			copy(signingRoot[:], att.SigningRoot)
-			wantedAtt, ok := wantedAttsByRoot[signingRoot]
+			wantedAtt, ok := wantedAttsByRoot[att.SigningRoot]
 			require.Equal(t, true, ok)
 			require.DeepEqual(t, wantedAtt, att)
 		}

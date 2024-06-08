@@ -1,7 +1,6 @@
 package kv
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -13,7 +12,7 @@ func (s *Store) SaveGenesisValidatorsRoot(_ context.Context, genValRoot []byte) 
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket(genesisInfoBucket)
 		enc := bkt.Get(genesisValidatorsRootKey)
-		if len(enc) != 0 && !bytes.Equal(enc, genValRoot) {
+		if len(enc) != 0 {
 			return fmt.Errorf("cannot overwrite existing genesis validators root: %#x", enc)
 		}
 		return bkt.Put(genesisValidatorsRootKey, genValRoot)

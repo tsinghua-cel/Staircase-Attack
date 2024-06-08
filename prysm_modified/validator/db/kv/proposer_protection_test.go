@@ -12,41 +12,25 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
-func TestNewProposalHistoryForSlot_ReturnsNilIfNoHistory(t *testing.T) {
-	valPubkey := [fieldparams.BLSPubkeyLength]byte{1, 2, 3}
-	db := setupDB(t, [][fieldparams.BLSPubkeyLength]byte{})
-
-	_, proposalExists, signingRootExists, err := db.ProposalHistoryForSlot(context.Background(), valPubkey, 0)
-	require.NoError(t, err)
-	assert.Equal(t, false, proposalExists)
-	assert.Equal(t, false, signingRootExists)
-}
-
 func TestProposalHistoryForSlot_InitializesNewPubKeys(t *testing.T) {
 	pubkeys := [][fieldparams.BLSPubkeyLength]byte{{30}, {25}, {20}}
 	db := setupDB(t, pubkeys)
 
 	for _, pub := range pubkeys {
-		_, proposalExists, signingRootExists, err := db.ProposalHistoryForSlot(context.Background(), pub, 0)
+		signingRoot, _, err := db.ProposalHistoryForSlot(context.Background(), pub, 0)
 		require.NoError(t, err)
-		assert.Equal(t, false, proposalExists)
-		assert.Equal(t, false, signingRootExists)
+		expected := bytesutil.PadTo([]byte{}, 32)
+		require.DeepEqual(t, expected, signingRoot[:], "Expected proposal history slot signing root to be empty")
 	}
 }
 
-func TestNewProposalHistoryForSlot_SigningRootNil(t *testing.T) {
-	pubkey := [fieldparams.BLSPubkeyLength]byte{1, 2, 3}
-	slot := primitives.Slot(2)
-
+func TestNewProposalHistoryForSlot_ReturnsNilIfNoHistory(t *testing.T) {
+	valPubkey := [fieldparams.BLSPubkeyLength]byte{1, 2, 3}
 	db := setupDB(t, [][fieldparams.BLSPubkeyLength]byte{})
 
-	err := db.SaveProposalHistoryForSlot(context.Background(), pubkey, slot, nil)
-	require.NoError(t, err, "Saving proposal history failed: %v")
-
-	_, proposalExists, signingRootExists, err := db.ProposalHistoryForSlot(context.Background(), pubkey, slot)
+	_, proposalExists, err := db.ProposalHistoryForSlot(context.Background(), valPubkey, 0)
 	require.NoError(t, err)
-	assert.Equal(t, true, proposalExists)
-	assert.Equal(t, false, signingRootExists)
+	assert.Equal(t, false, proposalExists)
 }
 
 func TestSaveProposalHistoryForSlot_OK(t *testing.T) {
@@ -57,10 +41,8 @@ func TestSaveProposalHistoryForSlot_OK(t *testing.T) {
 
 	err := db.SaveProposalHistoryForSlot(context.Background(), pubkey, slot, []byte{1})
 	require.NoError(t, err, "Saving proposal history failed: %v")
-	signingRoot, proposalExists, signingRootExists, err := db.ProposalHistoryForSlot(context.Background(), pubkey, slot)
+	signingRoot, _, err := db.ProposalHistoryForSlot(context.Background(), pubkey, slot)
 	require.NoError(t, err, "Failed to get proposal history")
-	assert.Equal(t, true, proposalExists)
-	assert.Equal(t, true, signingRootExists)
 
 	require.NotNil(t, signingRoot)
 	require.DeepEqual(t, bytesutil.PadTo([]byte{1}, 32), signingRoot[:], "Expected DB to keep object the same")

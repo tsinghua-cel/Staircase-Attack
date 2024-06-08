@@ -10,31 +10,31 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// PasswordReader is a mock of PasswordReader interface
-type PasswordReader struct {
+// MockPasswordReader is a mock of PasswordReader interface
+type MockPasswordReader struct {
 	ctrl     *gomock.Controller
-	recorder *PasswordReaderMockRecorder
+	recorder *MockPasswordReaderMockRecorder
 }
 
-// PasswordReaderMockRecorder is the mock recorder for MockPasswordReader
-type PasswordReaderMockRecorder struct {
-	mock *PasswordReader
+// MockPasswordReaderMockRecorder is the mock recorder for MockPasswordReader
+type MockPasswordReaderMockRecorder struct {
+	mock *MockPasswordReader
 }
 
-// NewPasswordReader creates a new mock instance
-func NewPasswordReader(ctrl *gomock.Controller) *PasswordReader {
-	mock := &PasswordReader{ctrl: ctrl}
-	mock.recorder = &PasswordReaderMockRecorder{mock}
+// NewMockPasswordReader creates a new mock instance
+func NewMockPasswordReader(ctrl *gomock.Controller) *MockPasswordReader {
+	mock := &MockPasswordReader{ctrl: ctrl}
+	mock.recorder = &MockPasswordReaderMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *PasswordReader) EXPECT() *PasswordReaderMockRecorder {
+func (m *MockPasswordReader) EXPECT() *MockPasswordReaderMockRecorder {
 	return m.recorder
 }
 
 // ReadPassword mocks base method
-func (m *PasswordReader) ReadPassword() (string, error) {
+func (m *MockPasswordReader) ReadPassword() (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadPassword")
 	ret0, _ := ret[0].(string)
@@ -43,7 +43,7 @@ func (m *PasswordReader) ReadPassword() (string, error) {
 }
 
 // ReadPassword indicates an expected call of ReadPassword
-func (mr *PasswordReaderMockRecorder) ReadPassword() *gomock.Call {
+func (mr *MockPasswordReaderMockRecorder) ReadPassword() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadPassword", reflect.TypeOf((*PasswordReader)(nil).ReadPassword))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadPassword", reflect.TypeOf((*MockPasswordReader)(nil).ReadPassword))
 }

@@ -6,10 +6,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
-	forkchoice2 "github.com/prysmaticlabs/prysm/v4/consensus-types/forkchoice"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	v1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
+
+// orphanLateBlockFirstThreshold is the number of seconds after which we
+// consider a block to be late, and thus a candidate to being reorged.
+const orphanLateBlockFirstThreshold = 4
 
 // ProcessAttestationsThreshold  is the number of seconds after which we
 // process attestations for the current slot
@@ -133,8 +137,7 @@ func (n *Node) setNodeAndParentValidated(ctx context.Context) error {
 // slot will have secs = 3 below.
 func (n *Node) arrivedEarly(genesisTime uint64) (bool, error) {
 	secs, err := slots.SecondsSinceSlotStart(n.slot, genesisTime, n.timestamp)
-	votingWindow := params.BeaconConfig().SecondsPerSlot / params.BeaconConfig().IntervalsPerSlot
-	return secs < votingWindow, err
+	return secs < orphanLateBlockFirstThreshold, err
 }
 
 // arrivedAfterOrphanCheck returns whether this block was inserted after the
@@ -148,7 +151,7 @@ func (n *Node) arrivedAfterOrphanCheck(genesisTime uint64) (bool, error) {
 }
 
 // nodeTreeDump appends to the given list all the nodes descending from this one
-func (n *Node) nodeTreeDump(ctx context.Context, nodes []*forkchoice2.Node) ([]*forkchoice2.Node, error) {
+func (n *Node) nodeTreeDump(ctx context.Context, nodes []*v1.ForkChoiceNode) ([]*v1.ForkChoiceNode, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -156,7 +159,7 @@ func (n *Node) nodeTreeDump(ctx context.Context, nodes []*forkchoice2.Node) ([]*
 	if n.parent != nil {
 		parentRoot = n.parent.root
 	}
-	thisNode := &forkchoice2.Node{
+	thisNode := &v1.ForkChoiceNode{
 		Slot:                     n.slot,
 		BlockRoot:                n.root[:],
 		ParentRoot:               parentRoot[:],
@@ -171,9 +174,9 @@ func (n *Node) nodeTreeDump(ctx context.Context, nodes []*forkchoice2.Node) ([]*
 		Timestamp:                n.timestamp,
 	}
 	if n.optimistic {
-		thisNode.Validity = forkchoice2.Optimistic
+		thisNode.Validity = v1.ForkChoiceNodeValidity_OPTIMISTIC
 	} else {
-		thisNode.Validity = forkchoice2.Valid
+		thisNode.Validity = v1.ForkChoiceNodeValidity_VALID
 	}
 
 	nodes = append(nodes, thisNode)

@@ -2,16 +2,12 @@ package accounts
 
 import (
 	"context"
-	"io"
-	"net/http"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	grpcutil "github.com/prysmaticlabs/prysm/v4/api/grpc"
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	"github.com/prysmaticlabs/prysm/v4/validator/accounts/wallet"
-	beaconApi "github.com/prysmaticlabs/prysm/v4/validator/client/beacon-api"
 	iface "github.com/prysmaticlabs/prysm/v4/validator/client/iface"
 	nodeClientFactory "github.com/prysmaticlabs/prysm/v4/validator/client/node-client-factory"
 	validatorClientFactory "github.com/prysmaticlabs/prysm/v4/validator/client/validator-client-factory"
@@ -22,10 +18,9 @@ import (
 )
 
 // NewCLIManager allows for managing validator accounts via CLI commands.
-func NewCLIManager(opts ...Option) (*CLIManager, error) {
-	acc := &CLIManager{
+func NewCLIManager(opts ...Option) (*AccountsCLIManager, error) {
+	acc := &AccountsCLIManager{
 		mnemonicLanguage: derived.DefaultMnemonicLanguage,
-		inputReader:      os.Stdin,
 	}
 	for _, opt := range opts {
 		if err := opt(acc); err != nil {
@@ -35,9 +30,9 @@ func NewCLIManager(opts ...Option) (*CLIManager, error) {
 	return acc, nil
 }
 
-// CLIManager defines a struct capable of performing various validator
+// AccountsCLIManager defines a struct capable of performing various validator
 // wallet & account operations via the command line.
-type CLIManager struct {
+type AccountsCLIManager struct {
 	wallet               *wallet.Wallet
 	keymanager           keymanager.IKeymanager
 	keymanagerKind       keymanager.Kind
@@ -69,10 +64,9 @@ type CLIManager struct {
 	mnemonic25thWord     string
 	beaconApiEndpoint    string
 	beaconApiTimeout     time.Duration
-	inputReader          io.Reader
 }
 
-func (acm *CLIManager) prepareBeaconClients(ctx context.Context) (*iface.ValidatorClient, *iface.NodeClient, error) {
+func (acm *AccountsCLIManager) prepareBeaconClients(ctx context.Context) (*iface.ValidatorClient, *iface.NodeClient, error) {
 	if acm.dialOpts == nil {
 		return nil, nil, errors.New("failed to construct dial options for beacon clients")
 	}
@@ -82,18 +76,14 @@ func (acm *CLIManager) prepareBeaconClients(ctx context.Context) (*iface.Validat
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "could not dial endpoint %s", acm.beaconRPCProvider)
 	}
+
 	conn := validatorHelpers.NewNodeConnection(
 		grpcConn,
 		acm.beaconApiEndpoint,
 		acm.beaconApiTimeout,
 	)
 
-	restHandler := &beaconApi.BeaconApiJsonRestHandler{
-		HttpClient: http.Client{Timeout: acm.beaconApiTimeout},
-		Host:       acm.beaconApiEndpoint,
-	}
-	validatorClient := validatorClientFactory.NewValidatorClient(conn, restHandler)
-	nodeClient := nodeClientFactory.NewNodeClient(conn, restHandler)
-
+	validatorClient := validatorClientFactory.NewValidatorClient(conn)
+	nodeClient := nodeClientFactory.NewNodeClient(conn)
 	return &validatorClient, &nodeClient, nil
 }

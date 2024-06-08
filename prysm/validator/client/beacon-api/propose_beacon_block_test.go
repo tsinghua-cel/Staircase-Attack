@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/prysmaticlabs/prysm/v4/network/httputil"
+	"github.com/prysmaticlabs/prysm/v4/api/gateway/apimiddleware"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/validator/client/beacon-api/mock"
@@ -16,29 +16,21 @@ import (
 func TestProposeBeaconBlock_Error(t *testing.T) {
 	testSuites := []struct {
 		name                 string
-		returnedError        error
 		expectedErrorMessage string
+		expectedHttpError    *apimiddleware.DefaultErrorJson
 	}{
 		{
 			name:                 "error 202",
-			expectedErrorMessage: "block was successfully broadcast but failed validation",
-			returnedError: &httputil.DefaultJsonError{
+			expectedErrorMessage: "block was successfully broadcasted but failed validation",
+			expectedHttpError: &apimiddleware.DefaultErrorJson{
 				Code:    http.StatusAccepted,
 				Message: "202 error",
 			},
 		},
 		{
-			name:                 "error 500",
-			expectedErrorMessage: "HTTP request unsuccessful (500: foo error)",
-			returnedError: &httputil.DefaultJsonError{
-				Code:    http.StatusInternalServerError,
-				Message: "foo error",
-			},
-		},
-		{
-			name:                 "other error",
-			expectedErrorMessage: "foo error",
-			returnedError:        errors.New("foo error"),
+			name:                 "request failed",
+			expectedErrorMessage: "failed to send POST data to REST endpoint",
+			expectedHttpError:    nil,
 		},
 	}
 
@@ -97,22 +89,24 @@ func TestProposeBeaconBlock_Error(t *testing.T) {
 				defer ctrl.Finish()
 
 				ctx := context.Background()
-				jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+				jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
 				headers := map[string]string{"Eth-Consensus-Version": testCase.consensusVersion}
-				jsonRestHandler.EXPECT().Post(
+				jsonRestHandler.EXPECT().PostRestJson(
 					ctx,
 					testCase.endpoint,
 					headers,
 					gomock.Any(),
 					nil,
 				).Return(
-					testSuite.returnedError,
+					testSuite.expectedHttpError,
+					errors.New("foo error"),
 				).Times(1)
 
 				validatorClient := &beaconApiValidatorClient{jsonRestHandler: jsonRestHandler}
 				_, err := validatorClient.proposeBeaconBlock(ctx, testCase.block)
 				assert.ErrorContains(t, testSuite.expectedErrorMessage, err)
+				assert.ErrorContains(t, "foo error", err)
 			})
 		}
 	}

@@ -31,12 +31,11 @@ func DefaultDataDir() string {
 	// Try to place the data folder in the user's home dir
 	home := file.HomeDir()
 	if home != "" {
-		switch runtime.GOOS {
-		case "darwin":
+		if runtime.GOOS == "darwin" {
 			return filepath.Join(home, "Library", "Eth2")
-		case "windows":
+		} else if runtime.GOOS == "windows" {
 			return filepath.Join(home, "AppData", "Local", "Eth2")
-		default:
+		} else {
 			return filepath.Join(home, ".eth2")
 		}
 	}

@@ -92,10 +92,10 @@ type Store struct {
 	ctx                 context.Context
 }
 
-// StoreDatafilePath is the canonical construction of a full
+// KVStoreDatafilePath is the canonical construction of a full
 // database file path from the directory path, so that code outside
 // this package can find the full path in a consistent way.
-func StoreDatafilePath(dirPath string) string {
+func KVStoreDatafilePath(dirPath string) string {
 	return path.Join(dirPath, DatabaseFileName)
 }
 
@@ -133,13 +133,10 @@ var Buckets = [][]byte{
 	blobsBucket,
 }
 
-// KVStoreOption is a functional option that modifies a kv.Store.
-type KVStoreOption func(*Store)
-
 // NewKVStore initializes a new boltDB key-value store at the directory
 // path specified, creates the kv-buckets based on the schema, and stores
 // an open connection db object as a property of the Store struct.
-func NewKVStore(ctx context.Context, dirPath string, opts ...KVStoreOption) (*Store, error) {
+func NewKVStore(ctx context.Context, dirPath string) (*Store, error) {
 	hasDir, err := file.HasDir(dirPath)
 	if err != nil {
 		return nil, err
@@ -149,7 +146,7 @@ func NewKVStore(ctx context.Context, dirPath string, opts ...KVStoreOption) (*St
 			return nil, err
 		}
 	}
-	datafile := StoreDatafilePath(dirPath)
+	datafile := KVStoreDatafilePath(dirPath)
 	log.Infof("Opening Bolt DB at %s", datafile)
 	boltDB, err := bolt.Open(
 		datafile,
@@ -192,9 +189,6 @@ func NewKVStore(ctx context.Context, dirPath string, opts ...KVStoreOption) (*St
 		stateSummaryCache:   newStateSummaryCache(),
 		ctx:                 ctx,
 	}
-	for _, o := range opts {
-		o(kv)
-	}
 	if err := kv.db.Update(func(tx *bolt.Tx) error {
 		return createBuckets(tx, Buckets...)
 	}); err != nil {
@@ -206,6 +200,10 @@ func NewKVStore(ctx context.Context, dirPath string, opts ...KVStoreOption) (*St
 	// Setup the type of block storage used depending on whether or not this is a fresh database.
 	if err := kv.setupBlockStorageType(ctx); err != nil {
 		return nil, err
+	}
+
+	if err := checkEpochsForBlobSidecarsRequestBucket(boltDB); err != nil {
+		return nil, errors.Wrap(err, "failed to check epochs for blob sidecars request bucket")
 	}
 
 	return kv, nil

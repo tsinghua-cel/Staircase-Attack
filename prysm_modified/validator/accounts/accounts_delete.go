@@ -3,16 +3,17 @@ package accounts
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/v4/io/prompt"
-	"github.com/prysmaticlabs/prysm/v4/validator/keymanager"
+	ethpbservice "github.com/prysmaticlabs/prysm/v4/proto/eth/service"
 )
 
 // Delete the accounts that the user requests to be deleted from the wallet.
-func (acm *CLIManager) Delete(ctx context.Context) error {
+func (acm *AccountsCLIManager) Delete(ctx context.Context) error {
 	rawPublicKeys := make([][]byte, len(acm.filteredPubKeys))
 	formattedPubKeys := make([]string, len(acm.filteredPubKeys))
 	for i, pk := range acm.filteredPubKeys {
@@ -25,7 +26,7 @@ func (acm *CLIManager) Delete(ctx context.Context) error {
 		if len(acm.filteredPubKeys) == 1 {
 			promptText := "Are you sure you want to delete 1 account? (%s) Y/N"
 			resp, err := prompt.ValidatePrompt(
-				acm.inputReader, fmt.Sprintf(promptText, au.BrightGreen(formattedPubKeys[0])), prompt.ValidateYesOrNo,
+				os.Stdin, fmt.Sprintf(promptText, au.BrightGreen(formattedPubKeys[0])), prompt.ValidateYesOrNo,
 			)
 			if err != nil {
 				return err
@@ -40,7 +41,7 @@ func (acm *CLIManager) Delete(ctx context.Context) error {
 			} else {
 				promptText = fmt.Sprintf(promptText, len(acm.filteredPubKeys), au.BrightGreen(allAccountStr))
 			}
-			resp, err := prompt.ValidatePrompt(acm.inputReader, promptText, prompt.ValidateYesOrNo)
+			resp, err := prompt.ValidatePrompt(os.Stdin, promptText, prompt.ValidateYesOrNo)
 			if err != nil {
 				return err
 			}
@@ -75,11 +76,11 @@ func DeleteAccount(ctx context.Context, cfg *DeleteConfig) error {
 	}
 	for i, status := range statuses {
 		switch status.Status {
-		case keymanager.StatusError:
+		case ethpbservice.DeletedKeystoreStatus_ERROR:
 			log.Errorf("Error deleting key %#x: %s", bytesutil.Trunc(cfg.DeletePublicKeys[i]), status.Message)
-		case keymanager.StatusNotActive:
+		case ethpbservice.DeletedKeystoreStatus_NOT_ACTIVE:
 			log.Warnf("Duplicate key %#x found in delete request", bytesutil.Trunc(cfg.DeletePublicKeys[i]))
-		case keymanager.StatusNotFound:
+		case ethpbservice.DeletedKeystoreStatus_NOT_FOUND:
 			log.Warnf("Could not find keystore for %#x", bytesutil.Trunc(cfg.DeletePublicKeys[i]))
 		}
 	}

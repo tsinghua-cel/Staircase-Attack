@@ -17,7 +17,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	"github.com/prysmaticlabs/prysm/v4/testing/util"
-	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 func TestProcessVoluntaryExits_NotActiveLongEnoughToExit(t *testing.T) {
@@ -135,10 +134,6 @@ func TestProcessVoluntaryExits_AppliesCorrectStatus(t *testing.T) {
 }
 
 func TestVerifyExitAndSignature(t *testing.T) {
-	undo := util.HackDenebMaxuint(t)
-	defer undo()
-	denebSlot, err := slots.EpochStart(params.BeaconConfig().DenebForkEpoch)
-	require.NoError(t, err)
 	tests := []struct {
 		name    string
 		setup   func() (*ethpb.Validator, *ethpb.SignedVoluntaryExit, state.ReadOnlyBeaconState, error)
@@ -246,11 +241,11 @@ func TestVerifyExitAndSignature(t *testing.T) {
 				fork := &ethpb.Fork{
 					PreviousVersion: params.BeaconConfig().CapellaForkVersion,
 					CurrentVersion:  params.BeaconConfig().DenebForkVersion,
-					Epoch:           params.BeaconConfig().DenebForkEpoch,
+					Epoch:           primitives.Epoch(2),
 				}
 				signedExit := &ethpb.SignedVoluntaryExit{
 					Exit: &ethpb.VoluntaryExit{
-						Epoch:          params.BeaconConfig().CapellaForkEpoch,
+						Epoch:          2,
 						ValidatorIndex: 0,
 					},
 				}
@@ -258,7 +253,7 @@ func TestVerifyExitAndSignature(t *testing.T) {
 				bs, err := state_native.InitializeFromProtoUnsafeDeneb(&ethpb.BeaconStateDeneb{
 					GenesisValidatorsRoot: bs.GenesisValidatorsRoot(),
 					Fork:                  fork,
-					Slot:                  denebSlot,
+					Slot:                  (params.BeaconConfig().SlotsPerEpoch * 2) + 1,
 					Validators:            bs.Validators(),
 				})
 				if err != nil {

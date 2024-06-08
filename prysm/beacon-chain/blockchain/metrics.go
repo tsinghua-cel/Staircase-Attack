@@ -358,7 +358,6 @@ func reportEpochMetrics(ctx context.Context, postState, headState state.BeaconSt
 	for name, val := range refMap {
 		stateTrieReferences.WithLabelValues(name).Set(float64(val))
 	}
-	postState.RecordStateMetrics()
 
 	return nil
 }

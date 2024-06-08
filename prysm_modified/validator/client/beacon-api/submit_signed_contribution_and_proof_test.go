@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/mock/gomock"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
@@ -22,11 +22,11 @@ func TestSubmitSignedContributionAndProof_Valid(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	jsonContributionAndProofs := []shared.SignedContributionAndProof{
+	jsonContributionAndProofs := []apimiddleware.SignedContributionAndProofJson{
 		{
-			Message: &shared.ContributionAndProof{
+			Message: &apimiddleware.ContributionAndProofJson{
 				AggregatorIndex: "1",
-				Contribution: &shared.SyncCommitteeContribution{
+				Contribution: &apimiddleware.SyncCommitteeContributionJson{
 					Slot:              "2",
 					BeaconBlockRoot:   hexutil.Encode([]byte{3}),
 					SubcommitteeIndex: "4",
@@ -44,14 +44,15 @@ func TestSubmitSignedContributionAndProof_Valid(t *testing.T) {
 
 	ctx := context.Background()
 
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+	jsonRestHandler.EXPECT().PostRestJson(
 		ctx,
 		submitSignedContributionAndProofTestEndpoint,
 		nil,
 		bytes.NewBuffer(marshalledContributionAndProofs),
 		nil,
 	).Return(
+		nil,
 		nil,
 	).Times(1)
 
@@ -107,7 +108,7 @@ func TestSubmitSignedContributionAndProof_Error(t *testing.T) {
 				},
 			},
 			httpRequestExpected:  true,
-			expectedErrorMessage: "foo error",
+			expectedErrorMessage: "failed to send POST data to REST endpoint: foo error",
 		},
 	}
 
@@ -118,15 +119,16 @@ func TestSubmitSignedContributionAndProof_Error(t *testing.T) {
 
 			ctx := context.Background()
 
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 			if testCase.httpRequestExpected {
-				jsonRestHandler.EXPECT().Post(
+				jsonRestHandler.EXPECT().PostRestJson(
 					ctx,
 					submitSignedContributionAndProofTestEndpoint,
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 				).Return(
+					nil,
 					errors.New("foo error"),
 				).Times(1)
 			}

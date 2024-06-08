@@ -9,35 +9,35 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	beacon "github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/beacon"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/beacon"
 	primitives "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 )
 
-// MockStateValidatorsProvider is a mock of StateValidatorsProvider interface.
-type MockStateValidatorsProvider struct {
+// MockstateValidatorsProvider is a mock of stateValidatorsProvider interface.
+type MockstateValidatorsProvider struct {
 	ctrl     *gomock.Controller
-	recorder *MockStateValidatorsProviderMockRecorder
+	recorder *MockstateValidatorsProviderMockRecorder
 }
 
-// MockStateValidatorsProviderMockRecorder is the mock recorder for MockStateValidatorsProvider.
-type MockStateValidatorsProviderMockRecorder struct {
-	mock *MockStateValidatorsProvider
+// MockstateValidatorsProviderMockRecorder is the mock recorder for MockstateValidatorsProvider.
+type MockstateValidatorsProviderMockRecorder struct {
+	mock *MockstateValidatorsProvider
 }
 
-// NewMockStateValidatorsProvider creates a new mock instance.
-func NewMockStateValidatorsProvider(ctrl *gomock.Controller) *MockStateValidatorsProvider {
-	mock := &MockStateValidatorsProvider{ctrl: ctrl}
-	mock.recorder = &MockStateValidatorsProviderMockRecorder{mock}
+// NewMockstateValidatorsProvider creates a new mock instance.
+func NewMockstateValidatorsProvider(ctrl *gomock.Controller) *MockstateValidatorsProvider {
+	mock := &MockstateValidatorsProvider{ctrl: ctrl}
+	mock.recorder = &MockstateValidatorsProviderMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockStateValidatorsProvider) EXPECT() *MockStateValidatorsProviderMockRecorder {
+func (m *MockstateValidatorsProvider) EXPECT() *MockstateValidatorsProviderMockRecorder {
 	return m.recorder
 }
 
 // GetStateValidators mocks base method.
-func (m *MockStateValidatorsProvider) GetStateValidators(arg0 context.Context, arg1 []string, arg2 []primitives.ValidatorIndex, arg3 []string) (*beacon.GetValidatorsResponse, error) {
+func (m *MockstateValidatorsProvider) GetStateValidators(arg0 context.Context, arg1 []string, arg2 []int64, arg3 []string) (*beacon.GetValidatorsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStateValidators", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*beacon.GetValidatorsResponse)
@@ -46,13 +46,13 @@ func (m *MockStateValidatorsProvider) GetStateValidators(arg0 context.Context, a
 }
 
 // GetStateValidators indicates an expected call of GetStateValidators.
-func (mr *MockStateValidatorsProviderMockRecorder) GetStateValidators(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockstateValidatorsProviderMockRecorder) GetStateValidators(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateValidators", reflect.TypeOf((*MockStateValidatorsProvider)(nil).GetStateValidators), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateValidators", reflect.TypeOf((*MockstateValidatorsProvider)(nil).GetStateValidators), arg0, arg1, arg2, arg3)
 }
 
 // GetStateValidatorsForHead mocks base method.
-func (m *MockStateValidatorsProvider) GetStateValidatorsForHead(arg0 context.Context, arg1 []string, arg2 []primitives.ValidatorIndex, arg3 []string) (*beacon.GetValidatorsResponse, error) {
+func (m *MockstateValidatorsProvider) GetStateValidatorsForHead(arg0 context.Context, arg1 []string, arg2 []primitives.ValidatorIndex, arg3 []string) (*beacon.GetValidatorsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStateValidatorsForHead", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*beacon.GetValidatorsResponse)
@@ -61,13 +61,13 @@ func (m *MockStateValidatorsProvider) GetStateValidatorsForHead(arg0 context.Con
 }
 
 // GetStateValidatorsForHead indicates an expected call of GetStateValidatorsForHead.
-func (mr *MockStateValidatorsProviderMockRecorder) GetStateValidatorsForHead(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockstateValidatorsProviderMockRecorder) GetStateValidatorsForHead(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateValidatorsForHead", reflect.TypeOf((*MockStateValidatorsProvider)(nil).GetStateValidatorsForHead), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateValidatorsForHead", reflect.TypeOf((*MockstateValidatorsProvider)(nil).GetStateValidatorsForHead), arg0, arg1, arg2, arg3)
 }
 
 // GetStateValidatorsForSlot mocks base method.
-func (m *MockStateValidatorsProvider) GetStateValidatorsForSlot(arg0 context.Context, arg1 primitives.Slot, arg2 []string, arg3 []primitives.ValidatorIndex, arg4 []string) (*beacon.GetValidatorsResponse, error) {
+func (m *MockstateValidatorsProvider) GetStateValidatorsForSlot(arg0 context.Context, arg1 primitives.Slot, arg2 []string, arg3 []primitives.ValidatorIndex, arg4 []string) (*beacon.GetValidatorsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStateValidatorsForSlot", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*beacon.GetValidatorsResponse)
@@ -76,7 +76,7 @@ func (m *MockStateValidatorsProvider) GetStateValidatorsForSlot(arg0 context.Con
 }
 
 // GetStateValidatorsForSlot indicates an expected call of GetStateValidatorsForSlot.
-func (mr *MockStateValidatorsProviderMockRecorder) GetStateValidatorsForSlot(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+func (mr *MockstateValidatorsProviderMockRecorder) GetStateValidatorsForSlot(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateValidatorsForSlot", reflect.TypeOf((*MockStateValidatorsProvider)(nil).GetStateValidatorsForSlot), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateValidatorsForSlot", reflect.TypeOf((*MockstateValidatorsProvider)(nil).GetStateValidatorsForSlot), arg0, arg1, arg2, arg3, arg4)
 }

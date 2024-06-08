@@ -15,7 +15,7 @@ import (
 var Commands = &cli.Command{
 	Name:     "web",
 	Category: "web",
-	Usage:    "Defines commands for interacting with the Prysm web interface.",
+	Usage:    "defines commands for interacting with the Prysm web interface",
 	Subcommands: []*cli.Command{
 		{
 			Name:        "generate-auth-token",

@@ -39,7 +39,7 @@ func (e *EnumValue) String() string {
 	return *e.Destination
 }
 
-// GenericFlag wraps the EnumValue in a GenericFlag value so that it satisfies the cli.Flag interface.
+// Wraps the EnumValue in a GenericFlag value so that it satisfies the cli.Flag interface.
 func (e EnumValue) GenericFlag() *cli.GenericFlag {
 	*e.Destination = e.Value
 	var i cli.Generic = &e

@@ -324,10 +324,61 @@ func UpgradeState(ctx context.Context, state state.BeaconState) (state.BeaconSta
 }
 
 // VerifyOperationLengths verifies that block operation lengths are valid.
-func VerifyOperationLengths(_ context.Context, state state.BeaconState, b interfaces.ReadOnlyBeaconBlock) (state.BeaconState, error) {
-	if b == nil || b.IsNil() {
-		return nil, blocks.ErrNilBeaconBlock
+func VerifyOperationLengths(_ context.Context, state state.BeaconState, b interfaces.ReadOnlySignedBeaconBlock) (state.BeaconState, error) {
+	if err := blocks.BeaconBlockIsNil(b); err != nil {
+		return nil, err
 	}
+	body := b.Block().Body()
+
+	if uint64(len(body.ProposerSlashings())) > params.BeaconConfig().MaxProposerSlashings {
+		return nil, fmt.Errorf(
+			"number of proposer slashings (%d) in block body exceeds allowed threshold of %d",
+			len(body.ProposerSlashings()),
+			params.BeaconConfig().MaxProposerSlashings,
+		)
+	}
+
+	if uint64(len(body.AttesterSlashings())) > params.BeaconConfig().MaxAttesterSlashings {
+		return nil, fmt.Errorf(
+			"number of attester slashings (%d) in block body exceeds allowed threshold of %d",
+			len(body.AttesterSlashings()),
+			params.BeaconConfig().MaxAttesterSlashings,
+		)
+	}
+
+	if uint64(len(body.Attestations())) > params.BeaconConfig().MaxAttestations {
+		return nil, fmt.Errorf(
+			"number of attestations (%d) in block body exceeds allowed threshold of %d",
+			len(body.Attestations()),
+			params.BeaconConfig().MaxAttestations,
+		)
+	}
+
+	if uint64(len(body.VoluntaryExits())) > params.BeaconConfig().MaxVoluntaryExits {
+		return nil, fmt.Errorf(
+			"number of voluntary exits (%d) in block body exceeds allowed threshold of %d",
+			len(body.VoluntaryExits()),
+			params.BeaconConfig().MaxVoluntaryExits,
+		)
+	}
+	eth1Data := state.Eth1Data()
+	if eth1Data == nil {
+		return nil, errors.New("nil eth1data in state")
+	}
+	if state.Eth1DepositIndex() > eth1Data.DepositCount {
+		return nil, fmt.Errorf("expected state.deposit_index %d <= eth1data.deposit_count %d", state.Eth1DepositIndex(), eth1Data.DepositCount)
+	}
+	maxDeposits := math.Min(params.BeaconConfig().MaxDeposits, eth1Data.DepositCount-state.Eth1DepositIndex())
+	// Verify outstanding deposits are processed up to max number of deposits
+	if uint64(len(body.Deposits())) != maxDeposits {
+		return nil, fmt.Errorf("incorrect outstanding deposits in block body, wanted: %d, got: %d",
+			maxDeposits, len(body.Deposits()))
+	}
+
+	return state, nil
+}
+
+func VerifyOperationLengthsNormal(_ context.Context, state state.BeaconState, b interfaces.ReadOnlyBeaconBlock) (state.BeaconState, error) {
 	body := b.Body()
 
 	if uint64(len(body.ProposerSlashings())) > params.BeaconConfig().MaxProposerSlashings {

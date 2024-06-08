@@ -33,8 +33,11 @@ type PerformExitCfg struct {
 	OutputDirectory  string
 }
 
+// ExitPassphrase exported for use in test.
+const ExitPassphrase = "Exit my validator"
+
 // Exit performs a voluntary exit on one or more accounts.
-func (acm *CLIManager) Exit(ctx context.Context) error {
+func (acm *AccountsCLIManager) Exit(ctx context.Context) error {
 	// User decided to cancel the voluntary exit.
 	if acm.rawPubKeys == nil && acm.formattedPubKeys == nil {
 		return nil
@@ -103,7 +106,7 @@ func PerformVoluntaryExit(
 				} else {
 					log.WithError(err).Errorf("voluntary exit failed for account %s", cfg.FormattedPubKeys[i])
 				}
-			} else if err := writeSignedVoluntaryExitJSON(sve, cfg.OutputDirectory); err != nil {
+			} else if err := writeSignedVoluntaryExitJSON(ctx, sve, cfg.OutputDirectory); err != nil {
 				log.WithError(err).Error("failed to write voluntary exit")
 			}
 		} else if err := client.ProposeExit(ctx, cfg.ValidatorClient, cfg.Keymanager.Sign, key, epoch); err != nil {
@@ -177,7 +180,7 @@ func displayExitInfo(rawExitedKeys [][]byte, trimmedExitedKeys []string) {
 	}
 }
 
-func writeSignedVoluntaryExitJSON(sve *eth.SignedVoluntaryExit, outputDirectory string) error {
+func writeSignedVoluntaryExitJSON(ctx context.Context, sve *eth.SignedVoluntaryExit, outputDirectory string) error {
 	if err := file.MkdirAll(outputDirectory); err != nil {
 		return err
 	}
@@ -188,7 +191,7 @@ func writeSignedVoluntaryExitJSON(sve *eth.SignedVoluntaryExit, outputDirectory 
 		return errors.Wrap(err, "failed to marshal JSON signed voluntary exit")
 	}
 
-	filepath := path.Join(outputDirectory, fmt.Sprintf("validator-exit-%s.json", jsve.Message.ValidatorIndex))
+	filepath := path.Join(outputDirectory, fmt.Sprintf("validator-exit-%s.json", jsve.Exit.ValidatorIndex))
 	if err := file.WriteFile(filepath, b); err != nil {
 		return errors.Wrap(err, "failed to write validator exist json")
 	}

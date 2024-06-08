@@ -2,6 +2,7 @@ package validator
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -13,18 +14,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/builder"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
 	blockfeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/block"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/operation"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/kv"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
@@ -38,8 +39,9 @@ import (
 var eth1DataNotification bool
 
 const (
-	eth1dataTimeout           = 2 * time.Second
-	defaultBuilderBoostFactor = uint64(100)
+	// CouldNotDecodeBlock means that a signed beacon block couldn't be created from the block present in the request.
+	CouldNotDecodeBlock = "Could not decode block"
+	eth1dataTimeout     = 2 * time.Second
 )
 
 // GetBeaconBlock is called by a proposer during its assigned slot to request a block to sign
@@ -69,11 +71,6 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
 	if parentRoot != headRoot {
 		blockchain.LateBlockAttemptedReorgCount.Inc()
-		log.WithFields(logrus.Fields{
-			"slot":       req.Slot,
-			"parentRoot": fmt.Sprintf("%#x", parentRoot),
-			"headRoot":   fmt.Sprintf("%#x", headRoot),
-		}).Warn("late block attempted reorg failed")
 	}
 
 	// An optimistic validator MUST NOT produce a block (i.e., sign across the DOMAIN_BEACON_PROPOSER domain).
@@ -109,12 +106,10 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	}
 	sBlk.SetProposerIndex(idx)
 
-	builderBoostFactor := defaultBuilderBoostFactor
-	if req.BuilderBoostFactor != nil {
-		builderBoostFactor = req.BuilderBoostFactor.Value
-	}
-
-	if err = vs.BuildBlockParallel(ctx, sBlk, head, req.SkipMevBoost, builderBoostFactor); err != nil {
+	var blobBundle *enginev1.BlobsBundle
+	var blindBlobBundle *enginev1.BlindedBlobsBundle
+	blindBlobBundle, blobBundle, err = vs.BuildBlockParallel(ctx, sBlk, head, req.SkipMevBoost)
+	if err != nil {
 		return nil, errors.Wrap(err, "could not build block in parallel")
 	}
 
@@ -124,17 +119,25 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	}
 	sBlk.SetStateRoot(sr)
 
+	fullBlobs, err := blobsBundleToSidecars(blobBundle, sBlk.Block())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not convert blobs bundle to sidecar: %v", err)
+	}
+	blindBlobs, err := blindBlobsBundleToSidecars(blindBlobBundle, sBlk.Block())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not convert blind blobs bundle to sidecar: %v", err)
+	}
+
 	log.WithFields(logrus.Fields{
 		"slot":               req.Slot,
 		"sinceSlotStartTime": time.Since(t),
 		"validator":          sBlk.Block().ProposerIndex(),
 	}).Info("Finished building block")
 
-	// Blob cache is updated after BuildBlockParallel
-	return vs.constructGenericBeaconBlock(sBlk, bundleCache.get(req.Slot))
+	return vs.constructGenericBeaconBlock(sBlk, blindBlobs, fullBlobs)
 }
 
-func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool, builderBoostFactor uint64) error {
+func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool) (*enginev1.BlindedBlobsBundle, *enginev1.BlobsBundle, error) {
 	// Build consensus fields in background
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -175,197 +178,178 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 		vs.setBlsToExecData(sBlk, head)
 	}()
 
-	localPayload, overrideBuilder, err := vs.getLocalPayload(ctx, sBlk.Block(), head)
+	localPayload, blobsBundle, overrideBuilder, err := vs.getLocalPayloadAndBlobs(ctx, sBlk.Block(), head)
 	if err != nil {
-		return status.Errorf(codes.Internal, "Could not get local payload: %v", err)
+		return nil, nil, status.Errorf(codes.Internal, "Could not get local payload: %v", err)
 	}
 
 	// There's no reason to try to get a builder bid if local override is true.
 	var builderPayload interfaces.ExecutionData
-	var builderKzgCommitments [][]byte
+	var blindBlobsBundle *enginev1.BlindedBlobsBundle
 	overrideBuilder = overrideBuilder || skipMevBoost // Skip using mev-boost if requested by the caller.
 	if !overrideBuilder {
-		builderPayload, builderKzgCommitments, err = vs.getBuilderPayloadAndBlobs(ctx, sBlk.Block().Slot(), sBlk.Block().ProposerIndex())
+		builderPayload, blindBlobsBundle, err = vs.getBuilderPayloadAndBlobs(ctx, sBlk.Block().Slot(), sBlk.Block().ProposerIndex())
 		if err != nil {
 			builderGetPayloadMissCount.Inc()
 			log.WithError(err).Error("Could not get builder payload")
 		}
 	}
 
-	if err := setExecutionData(ctx, sBlk, localPayload, builderPayload, builderKzgCommitments, builderBoostFactor); err != nil {
-		return status.Errorf(codes.Internal, "Could not set execution data: %v", err)
+	if err := setExecutionData(ctx, sBlk, localPayload, builderPayload); err != nil {
+		return nil, nil, status.Errorf(codes.Internal, "Could not set execution data: %v", err)
+	}
+
+	if err := setKzgCommitments(sBlk, blobsBundle, blindBlobsBundle); err != nil {
+		return nil, nil, status.Errorf(codes.Internal, "Could not set kzg commitment: %v", err)
 	}
 
 	wg.Wait() // Wait until block is built via consensus and execution fields.
 
-	return nil
+	return blindBlobsBundle, blobsBundle, nil
 }
 
-// ProposeBeaconBlock handles the proposal of beacon blocks.
+// ProposeBeaconBlock is called by a proposer during its assigned slot to create a block in an attempt
+// to get it processed by the beacon node as the canonical head.
 func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSignedBeaconBlock) (*ethpb.ProposeResponse, error) {
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.ProposeBeaconBlock")
 	defer span.End()
 
-	if req == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "empty request")
-	}
-
-	block, err := blocks.NewSignedBeaconBlock(req.Block)
+	blk, err := blocks.NewSignedBeaconBlock(req.Block)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%s: %v", "decode block failed", err)
+		return nil, status.Errorf(codes.InvalidArgument, "%s: %v", CouldNotDecodeBlock, err)
 	}
 
-	var sidecars []*ethpb.BlobSidecar
-	if block.IsBlinded() {
-		block, sidecars, err = vs.handleBlindedBlock(ctx, block)
-	} else {
-		sidecars, err = vs.handleUnblindedBlock(block, req)
+	var blindSidecars []*ethpb.SignedBlindedBlobSidecar
+	if blk.Version() >= version.Deneb && blk.IsBlinded() {
+		blindSidecars = req.GetBlindedDeneb().SignedBlindedBlobSidecars
 	}
+
+	unblinder, err := newUnblinder(blk, blindSidecars, vs.BlockBuilder)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "%s: %v", "handle block failed", err)
+		return nil, errors.Wrap(err, "could not create unblinder")
 	}
+	blinded := unblinder.b.IsBlinded() //
 
-	root, err := block.Block().HashTreeRoot()
+	blk, unblindedSidecars, err := unblinder.unblindBuilderBlock(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not hash tree root: %v", err)
+		return nil, errors.Wrap(err, "could not unblind builder block")
 	}
 
-	var wg sync.WaitGroup
-	errChan := make(chan error, 1)
+	// Broadcast the new block to the network.
+	blkPb, err := blk.Proto()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get protobuf block")
+	}
+	if err := vs.P2P.Broadcast(ctx, blkPb); err != nil {
+		return nil, fmt.Errorf("could not broadcast block: %v", err)
+	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := vs.broadcastReceiveBlock(ctx, block, root); err != nil {
-			errChan <- errors.Wrap(err, "broadcast/receive block failed")
-			return
+	var scs []*ethpb.SignedBlobSidecar
+	if blk.Version() >= version.Deneb {
+		if blinded {
+			scs = unblindedSidecars // Use sidecars from unblinder if the block was blinded.
+		} else {
+			scs, err = extraSidecars(req) // Use sidecars from the request if the block was not blinded.
+			if err != nil {
+				return nil, errors.Wrap(err, "could not extract blobs")
+			}
 		}
-		errChan <- nil
-	}()
-
-	if err := vs.broadcastAndReceiveBlobs(ctx, sidecars, root); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive blobs: %v", err)
+		sidecars := make([]*ethpb.BlobSidecar, len(scs))
+		for i, sc := range scs {
+			log.WithFields(logrus.Fields{
+				"blockRoot": hex.EncodeToString(sc.Message.BlockRoot),
+				"index":     sc.Message.Index,
+			}).Debug("Broadcasting blob sidecar")
+			if err := vs.P2P.BroadcastBlob(ctx, sc.Message.Index, sc); err != nil {
+				log.WithError(err).Errorf("Could not broadcast blob sidecar index %d / %d", i, len(scs))
+			}
+			sidecars[i] = sc.Message
+		}
+		if len(scs) > 0 {
+			if err := vs.BeaconDB.SaveBlobSidecar(ctx, sidecars); err != nil {
+				return nil, err
+			}
+		}
 	}
 
-	wg.Wait()
-	if err := <-errChan; err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive block: %v", err)
-	}
-
-	return &ethpb.ProposeResponse{BlockRoot: root[:]}, nil
-}
-
-// handleBlindedBlock processes blinded beacon blocks.
-func (vs *Server) handleBlindedBlock(ctx context.Context, block interfaces.SignedBeaconBlock) (interfaces.SignedBeaconBlock, []*ethpb.BlobSidecar, error) {
-	if block.Version() < version.Bellatrix {
-		return nil, nil, errors.New("pre-Bellatrix blinded block")
-	}
-	if vs.BlockBuilder == nil || !vs.BlockBuilder.Configured() {
-		return nil, nil, errors.New("unconfigured block builder")
-	}
-
-	copiedBlock, err := block.Copy()
+	root, err := blk.Block().HashTreeRoot()
 	if err != nil {
-		return nil, nil, err
+		return nil, fmt.Errorf("could not tree hash block: %v", err)
+	}
+	log.WithFields(logrus.Fields{
+		"blockRoot": hex.EncodeToString(root[:]),
+	}).Debug("Broadcasting block")
+
+	if err := vs.BlockReceiver.ReceiveBlock(ctx, blk, root); err != nil {
+		return nil, fmt.Errorf("could not process beacon block: %v", err)
 	}
 
-	payload, bundle, err := vs.BlockBuilder.SubmitBlindedBlock(ctx, block)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "submit blinded block failed")
-	}
-
-	if err := copiedBlock.Unblind(payload); err != nil {
-		return nil, nil, errors.Wrap(err, "unblind failed")
-	}
-
-	sidecars, err := unblindBlobsSidecars(copiedBlock, bundle)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "unblind sidecars failed")
-	}
-
-	return copiedBlock, sidecars, nil
-}
-
-// handleUnblindedBlock processes unblinded beacon blocks.
-func (vs *Server) handleUnblindedBlock(block interfaces.SignedBeaconBlock, req *ethpb.GenericSignedBeaconBlock) ([]*ethpb.BlobSidecar, error) {
-	dbBlockContents := req.GetDeneb()
-	if dbBlockContents == nil {
-		return nil, nil
-	}
-	return buildBlobSidecars(block, dbBlockContents.Blobs, dbBlockContents.KzgProofs)
-}
-
-// broadcastReceiveBlock broadcasts a block and handles its reception.
-func (vs *Server) broadcastReceiveBlock(ctx context.Context, block interfaces.SignedBeaconBlock, root [32]byte) error {
-	protoBlock, err := block.Proto()
-	if err != nil {
-		return errors.Wrap(err, "protobuf conversion failed")
-	}
-	if err := vs.P2P.Broadcast(ctx, protoBlock); err != nil {
-		return errors.Wrap(err, "broadcast failed")
-	}
+	log.WithField("slot", blk.Block().Slot()).Debugf(
+		"Block proposal received via RPC")
 	vs.BlockNotifier.BlockFeed().Send(&feed.Event{
 		Type: blockfeed.ReceivedBlock,
-		Data: &blockfeed.ReceivedBlockData{SignedBlock: block},
+		Data: &blockfeed.ReceivedBlockData{SignedBlock: blk},
 	})
-	return vs.BlockReceiver.ReceiveBlock(ctx, block, root, nil)
+
+	return &ethpb.ProposeResponse{
+		BlockRoot: root[:],
+	}, nil
 }
 
-// broadcastAndReceiveBlobs handles the broadcasting and reception of blob sidecars.
-func (vs *Server) broadcastAndReceiveBlobs(ctx context.Context, sidecars []*ethpb.BlobSidecar, root [32]byte) error {
-	for i, sc := range sidecars {
-		if err := vs.P2P.BroadcastBlob(ctx, uint64(i), sc); err != nil {
-			return errors.Wrap(err, "broadcast blob failed")
-		}
-
-		readOnlySc, err := blocks.NewROBlobWithRoot(sc, root)
-		if err != nil {
-			return errors.Wrap(err, "ROBlob creation failed")
-		}
-		verifiedBlob := blocks.NewVerifiedROBlob(readOnlySc)
-		if err := vs.BlobReceiver.ReceiveBlob(ctx, verifiedBlob); err != nil {
-			return errors.Wrap(err, "receive blob failed")
-		}
-		vs.OperationNotifier.OperationFeed().Send(&feed.Event{
-			Type: operation.BlobSidecarReceived,
-			Data: &operation.BlobSidecarReceivedData{Blob: &verifiedBlob},
-		})
+// extraSidecars extracts the sidecars from the request.
+// return error if there are too many sidecars.
+func extraSidecars(req *ethpb.GenericSignedBeaconBlock) ([]*ethpb.SignedBlobSidecar, error) {
+	b, ok := req.GetBlock().(*ethpb.GenericSignedBeaconBlock_Deneb)
+	if !ok {
+		return nil, errors.New("Could not cast block to Deneb")
 	}
-	return nil
+	if len(b.Deneb.Blobs) > fieldparams.MaxBlobsPerBlock {
+		return nil, fmt.Errorf("too many blobs in block: %d", len(b.Deneb.Blobs))
+	}
+	return b.Deneb.Blobs, nil
 }
 
 // PrepareBeaconProposer caches and updates the fee recipient for the given proposer.
 func (vs *Server) PrepareBeaconProposer(
-	_ context.Context, request *ethpb.PrepareBeaconProposerRequest,
+	ctx context.Context, request *ethpb.PrepareBeaconProposerRequest,
 ) (*emptypb.Empty, error) {
+	ctx, span := trace.StartSpan(ctx, "validator.PrepareBeaconProposer")
+	defer span.End()
+	var feeRecipients []common.Address
 	var validatorIndices []primitives.ValidatorIndex
 
+	newRecipients := make([]*ethpb.PrepareBeaconProposerRequest_FeeRecipientContainer, 0, len(request.Recipients))
 	for _, r := range request.Recipients {
-		recipient := hexutil.Encode(r.FeeRecipient)
+		f, err := vs.BeaconDB.FeeRecipientByValidatorID(ctx, r.ValidatorIndex)
+		switch {
+		case errors.Is(err, kv.ErrNotFoundFeeRecipient):
+			newRecipients = append(newRecipients, r)
+		case err != nil:
+			return nil, status.Errorf(codes.Internal, "Could not get fee recipient by validator index: %v", err)
+		default:
+			if common.BytesToAddress(r.FeeRecipient) != f {
+				newRecipients = append(newRecipients, r)
+			}
+		}
+	}
+	if len(newRecipients) == 0 {
+		return &emptypb.Empty{}, nil
+	}
+
+	for _, recipientContainer := range newRecipients {
+		recipient := hexutil.Encode(recipientContainer.FeeRecipient)
 		if !common.IsHexAddress(recipient) {
 			return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Invalid fee recipient address: %v", recipient))
 		}
-		// Use default address if the burn address is return
-		feeRecipient := primitives.ExecutionAddress(r.FeeRecipient)
-		if feeRecipient == primitives.ExecutionAddress([20]byte{}) {
-			feeRecipient = primitives.ExecutionAddress(params.BeaconConfig().DefaultFeeRecipient)
-			if feeRecipient == primitives.ExecutionAddress([20]byte{}) {
-				log.WithField("validatorIndex", r.ValidatorIndex).Warn("fee recipient is the burn address")
-			}
-		}
-		val := cache.TrackedValidator{
-			Active:       true, // TODO: either check or add the field in the request
-			Index:        r.ValidatorIndex,
-			FeeRecipient: feeRecipient,
-		}
-		vs.TrackedValidatorsCache.Set(val)
-		validatorIndices = append(validatorIndices, r.ValidatorIndex)
+		feeRecipients = append(feeRecipients, common.BytesToAddress(recipientContainer.FeeRecipient))
+		validatorIndices = append(validatorIndices, recipientContainer.ValidatorIndex)
 	}
-	if len(validatorIndices) != 0 {
-		log.WithFields(logrus.Fields{
-			"validatorCount": len(validatorIndices),
-		}).Info("Updated fee recipient addresses for validator indices")
+	if err := vs.BeaconDB.SaveFeeRecipientsByValidatorIDs(ctx, validatorIndices, feeRecipients); err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not save fee recipients: %v", err)
 	}
+	log.WithFields(logrus.Fields{
+		"validatorIndices": validatorIndices,
+	}).Info("Updated fee recipient addresses for validator indices")
 	return &emptypb.Empty{}, nil
 }
 

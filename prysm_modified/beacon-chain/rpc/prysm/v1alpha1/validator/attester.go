@@ -2,7 +2,7 @@ package validator
 
 import (
 	"context"
-
+	"github.com/prysmaticlabs/prysm/v4/attacker"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/operation"
@@ -12,10 +12,12 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
+	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"os"
 )
 
 // GetAttestationData requests that the beacon node produce an attestation data object,
@@ -31,6 +33,12 @@ func (vs *Server) GetAttestationData(ctx context.Context, req *ethpb.Attestation
 	if vs.SyncChecker.Syncing() {
 		return nil, status.Errorf(codes.Unavailable, "Syncing to latest head, not ready to respond")
 	}
+
+	// An optimistic validator MUST NOT participate in attestation. (i.e., sign across the DOMAIN_BEACON_ATTESTER, DOMAIN_SELECTION_PROOF or DOMAIN_AGGREGATE_AND_PROOF domains).
+	if err := vs.optimisticStatus(ctx); err != nil {
+		return nil, err
+	}
+
 	res, err := vs.CoreService.GetAttestationData(ctx, req)
 	if err != nil {
 		return nil, status.Errorf(core.ErrorReasonToGRPC(err.Reason), "Could not get attestation data: %v", err.Err)
@@ -69,10 +77,60 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 		return nil, err
 	}
 	subnet := helpers.ComputeSubnetFromCommitteeAndSlot(uint64(len(vals)), att.Data.CommitteeIndex, att.Data.Slot)
+	// beacon node:
+	// 1. before broad cast attest.
+	// 2. after broad cast attest.
+	client := attacker.GetAttacker()
+	skipBroadCast := false
+	if client != nil {
+		var res attackclient.AttackerResponse
+		res, err = client.AttestBeforeBroadCast(context.Background(), uint64(att.Data.Slot))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestBeforeBroadCast")
+		} else {
+			log.WithField("attacker", "AttestBeforeBroadCast").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			os.Exit(-1)
+		case attackclient.CMD_SKIP:
+			skipBroadCast = true
+		case attackclient.CMD_RETURN:
+			return &ethpb.AttestResponse{
+				AttestationDataRoot: root[:],
+			}, nil
+		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			// do nothing.
+		}
+	}
 
-	// Broadcast the new attestation to the network.
-	if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
+	if !skipBroadCast {
+		// Broadcast the new attestation to the network.
+		if err := vs.P2P.BroadcastAttestation(ctx, subnet, att); err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not broadcast attestation: %v", err)
+		}
+	}
+
+	if client != nil {
+		var res attackclient.AttackerResponse
+		res, err = client.AttestAfterBroadCast(context.Background(), uint64(att.Data.Slot))
+		if err != nil {
+			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestAfterBroadCast")
+		} else {
+			log.WithField("attacker", "AttestAfterBroadCast").Info("attacker succeed")
+		}
+		switch res.Cmd {
+		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			os.Exit(-1)
+		case attackclient.CMD_SKIP:
+			// just nothing to do.
+		case attackclient.CMD_RETURN:
+			return &ethpb.AttestResponse{
+				AttestationDataRoot: root[:],
+			}, nil
+		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			// do nothing.
+		}
 	}
 
 	go func() {

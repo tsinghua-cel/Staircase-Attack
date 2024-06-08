@@ -10,8 +10,8 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/beacon"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/node"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/validator"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 
@@ -55,8 +55,12 @@ func (c *beaconApiValidatorClient) getFork(ctx context.Context) (*beacon.GetStat
 
 	stateForkResponseJson := &beacon.GetStateForkResponse{}
 
-	if err := c.jsonRestHandler.Get(ctx, endpoint, stateForkResponseJson); err != nil {
-		return nil, err
+	if _, err := c.jsonRestHandler.GetRestJsonResponse(
+		ctx,
+		endpoint,
+		stateForkResponseJson,
+	); err != nil {
+		return nil, errors.Wrapf(err, "failed to get json response from `%s` REST endpoint", endpoint)
 	}
 
 	return stateForkResponseJson, nil
@@ -67,8 +71,12 @@ func (c *beaconApiValidatorClient) getHeaders(ctx context.Context) (*beacon.GetB
 
 	blockHeadersResponseJson := &beacon.GetBlockHeadersResponse{}
 
-	if err := c.jsonRestHandler.Get(ctx, endpoint, blockHeadersResponseJson); err != nil {
-		return nil, err
+	if _, err := c.jsonRestHandler.GetRestJsonResponse(
+		ctx,
+		endpoint,
+		blockHeadersResponseJson,
+	); err != nil {
+		return nil, errors.Wrapf(err, "failed to get json response from `%s` REST endpoint", endpoint)
 	}
 
 	return blockHeadersResponseJson, nil
@@ -85,20 +93,24 @@ func (c *beaconApiValidatorClient) getLiveness(ctx context.Context, epoch primit
 		return nil, errors.Wrapf(err, "failed to marshal validator indexes")
 	}
 
-	if err = c.jsonRestHandler.Post(ctx, url, nil, bytes.NewBuffer(marshalledJsonValidatorIndexes), livenessResponseJson); err != nil {
-		return nil, err
+	if _, err := c.jsonRestHandler.PostRestJson(ctx, url, nil, bytes.NewBuffer(marshalledJsonValidatorIndexes), livenessResponseJson); err != nil {
+		return nil, errors.Wrapf(err, "failed to send POST data to `%s` REST URL", url)
 	}
 
 	return livenessResponseJson, nil
 }
 
-func (c *beaconApiValidatorClient) getSyncing(ctx context.Context) (*node.SyncStatusResponse, error) {
+func (c *beaconApiValidatorClient) getSyncing(ctx context.Context) (*apimiddleware.SyncingResponseJson, error) {
 	const endpoint = "/eth/v1/node/syncing"
 
-	syncingResponseJson := &node.SyncStatusResponse{}
+	syncingResponseJson := &apimiddleware.SyncingResponseJson{}
 
-	if err := c.jsonRestHandler.Get(ctx, endpoint, syncingResponseJson); err != nil {
-		return nil, err
+	if _, err := c.jsonRestHandler.GetRestJsonResponse(
+		ctx,
+		endpoint,
+		syncingResponseJson,
+	); err != nil {
+		return nil, errors.Wrapf(err, "failed to get json response from `%s` REST endpoint", endpoint)
 	}
 
 	return syncingResponseJson, nil

@@ -19,14 +19,8 @@ func (c beaconApiValidatorClient) proposeAttestation(ctx context.Context, attest
 		return nil, err
 	}
 
-	if err = c.jsonRestHandler.Post(
-		ctx,
-		"/eth/v1/beacon/pool/attestations",
-		nil,
-		bytes.NewBuffer(marshalledAttestation),
-		nil,
-	); err != nil {
-		return nil, err
+	if _, err := c.jsonRestHandler.PostRestJson(ctx, "/eth/v1/beacon/pool/attestations", nil, bytes.NewBuffer(marshalledAttestation), nil); err != nil {
+		return nil, errors.Wrap(err, "failed to send POST data to REST endpoint")
 	}
 
 	attestationDataRoot, err := attestation.Data.HashTreeRoot()

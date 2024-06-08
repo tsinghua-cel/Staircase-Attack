@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // ROBlock is a value that embeds a ReadOnlySignedBeaconBlock along with its block root ([32]byte).
@@ -74,18 +75,14 @@ func (s ROBlockSlice) Len() int {
 	return len(s)
 }
 
-// BlockWithROBlobs is a wrapper that collects the block and blob values together.
-// This is helpful because these values are collated from separate RPC requests.
-type BlockWithROBlobs struct {
+type BlockWithVerifiedBlobs struct {
 	Block ROBlock
-	Blobs []ROBlob
+	Blobs []*eth.BlobSidecar
 }
 
-// BlockWithROBlobsSlice gives convenient access to getting a slice of just the ROBlocks,
-// and defines sorting helpers.
-type BlockWithROBlobsSlice []BlockWithROBlobs
+type BlockWithVerifiedBlobsSlice []BlockWithVerifiedBlobs
 
-func (s BlockWithROBlobsSlice) ROBlocks() []ROBlock {
+func (s BlockWithVerifiedBlobsSlice) ROBlocks() []ROBlock {
 	r := make([]ROBlock, len(s))
 	for i := range s {
 		r[i] = s[i].Block
@@ -96,7 +93,7 @@ func (s BlockWithROBlobsSlice) ROBlocks() []ROBlock {
 // Less reports whether the element with index i must sort before the element with index j.
 // ROBlocks are ordered first by their slot,
 // with a lexicographic sort of roots breaking ties for slots with duplicate blocks.
-func (s BlockWithROBlobsSlice) Less(i, j int) bool {
+func (s BlockWithVerifiedBlobsSlice) Less(i, j int) bool {
 	si, sj := s[i].Block.Block().Slot(), s[j].Block.Block().Slot()
 
 	// lower slot wins
@@ -110,11 +107,11 @@ func (s BlockWithROBlobsSlice) Less(i, j int) bool {
 }
 
 // Swap swaps the elements with indexes i and j.
-func (s BlockWithROBlobsSlice) Swap(i, j int) {
+func (s BlockWithVerifiedBlobsSlice) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
 // Len is the number of elements in the collection.
-func (s BlockWithROBlobsSlice) Len() int {
+func (s BlockWithVerifiedBlobsSlice) Len() int {
 	return len(s)
 }

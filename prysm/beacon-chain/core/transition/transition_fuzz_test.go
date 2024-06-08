@@ -103,18 +103,18 @@ func TestFuzzprocessOperationsNoVerify_1000(t *testing.T) {
 	ctx := context.Background()
 	state, err := state_native.InitializeFromProtoUnsafePhase0(&ethpb.BeaconState{})
 	require.NoError(t, err)
-	bb := &ethpb.BeaconBlock{}
+	bb := &ethpb.SignedBeaconBlock{}
 	fuzzer := fuzz.NewWithSeed(0)
 	fuzzer.NilChance(0.1)
 	for i := 0; i < 1000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(bb)
-		if bb.Body == nil {
+		if bb.Block == nil || bb.Block.Body == nil {
 			continue
 		}
-		wb, err := blocks.NewBeaconBlock(bb)
+		wsb, err := blocks.NewSignedBeaconBlock(bb)
 		require.NoError(t, err)
-		s, err := ProcessOperationsNoVerifyAttsSigs(ctx, state, wb)
+		s, err := ProcessOperationsNoVerifyAttsSigs(ctx, state, wsb)
 		if err != nil && s != nil {
 			t.Fatalf("state should be nil on err. found: %v on error: %v for block body: %v", s, err, bb)
 		}
@@ -126,18 +126,18 @@ func TestFuzzverifyOperationLengths_10000(t *testing.T) {
 	defer SkipSlotCache.Enable()
 	state, err := state_native.InitializeFromProtoUnsafePhase0(&ethpb.BeaconState{})
 	require.NoError(t, err)
-	bb := &ethpb.BeaconBlock{}
+	bb := &ethpb.SignedBeaconBlock{}
 	fuzzer := fuzz.NewWithSeed(0)
 	fuzzer.NilChance(0.1)
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(bb)
-		if bb.Body == nil {
+		if bb.Block == nil || bb.Block.Body == nil {
 			continue
 		}
-		wb, err := blocks.NewBeaconBlock(bb)
+		wsb, err := blocks.NewSignedBeaconBlock(bb)
 		require.NoError(t, err)
-		_, err = VerifyOperationLengths(context.Background(), state, wb)
+		_, err = VerifyOperationLengths(context.Background(), state, wsb)
 		_ = err
 	}
 }

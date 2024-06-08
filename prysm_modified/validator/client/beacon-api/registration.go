@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
@@ -16,7 +17,11 @@ func (c *beaconApiValidatorClient) submitValidatorRegistrations(ctx context.Cont
 	jsonRegistration := make([]*shared.SignedValidatorRegistration, len(registrations))
 
 	for index, registration := range registrations {
-		jsonRegistration[index] = shared.SignedValidatorRegistrationFromConsensus(registration)
+		outMessage, err := shared.SignedValidatorRegistrationFromConsensus(registration)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to encode to SignedValidatorRegistration at index %d", index))
+		}
+		jsonRegistration[index] = outMessage
 	}
 
 	marshalledJsonRegistration, err := json.Marshal(jsonRegistration)
@@ -24,5 +29,9 @@ func (c *beaconApiValidatorClient) submitValidatorRegistrations(ctx context.Cont
 		return errors.Wrap(err, "failed to marshal registration")
 	}
 
-	return c.jsonRestHandler.Post(ctx, endpoint, nil, bytes.NewBuffer(marshalledJsonRegistration), nil)
+	if _, err := c.jsonRestHandler.PostRestJson(ctx, endpoint, nil, bytes.NewBuffer(marshalledJsonRegistration), nil); err != nil {
+		return errors.Wrapf(err, "failed to send POST data to `%s` REST endpoint", endpoint)
+	}
+
+	return nil
 }

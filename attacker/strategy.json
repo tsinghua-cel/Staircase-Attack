@@ -1,0 +1,64 @@
+{
+  "slots":[
+    {
+      "slot": "every",
+      "level": 0,
+      "actions": {
+        "AttestAfterSign": "storeSignedAttest",
+        "AttestBeforePropose": "return",
+        "BlockBeforeSign": "return"
+      }
+    },
+    {
+      "slot": "lastAttackerSlotInCurrentEpoch",
+      "level": 1,
+      "actions": {
+        "AttestAfterSign": "storeSignedAttest",
+        "BlockDelayForReceiveBlock":"delayToEpochEnd",
+        "BlockBeforeBroadCast": "delayHalfEpoch",
+        "BlockBeforeSign": "rePackAttestation"
+      }
+    }
+  ],
+
+  "validator": [
+    {
+      "validator_index": 1,
+      "attacker_start_slot": 1,
+      "attacker_end_slot": 1000
+    },
+    {
+      "validator_index": 8,
+      "attacker_start_slot": 1,
+      "attacker_end_slot": 1000
+    },
+    {
+      "validator_index": 15,
+      "attacker_start_slot": 1,
+      "attacker_end_slot": 1000
+    },
+    {
+      "validator_index": 23,
+      "attacker_start_slot": 1,
+      "attacker_end_slot": 1000
+    },
+    {
+      "validator_index": 30,
+      "attacker_start_slot": 1,
+      "attacker_end_slot": 1000
+    },
+    {
+      "validator_index": 1,
+      "attacker_start_slot": 1,
+      "attacker_end_slot": 1000
+    }
+  ],
+  "block": {
+    "enable": false,
+    "broad_cast_delay": 40000
+  },
+  "attest": {
+    "enable": false,
+    "broad_cast_delay": 40000
+  }
+}

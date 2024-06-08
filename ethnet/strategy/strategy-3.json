@@ -1,0 +1,196 @@
+{
+	"slots":[
+	{
+		"slot": "every",
+			"level": 0,
+			"actions": {
+				"AttestAfterSign": "storeSignedAttest",
+				"AttestBeforePropose": "return",
+				"BlockBeforeSign": "return",
+				"BlockAfterSign": "return"
+			}
+	},
+	{
+		"slot": "lastAttackerSlotInCurrentEpoch",
+		"level": 1,
+		"actions": {
+			"AttestAfterSign": "storeSignedAttest",
+			"BlockDelayForReceiveBlock":"delayToEpochEnd",
+			"BlockBeforeBroadCast": "delayHalfEpoch",
+			"BlockBeforeSign": "rePackAttestation"
+		}
+	}
+	],
+	"validator": [
+	{
+		"validator_index": 0,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 1,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 2,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 3,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 4,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 5,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 6,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 7,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 8,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 9,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 10,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 11,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 12,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 13,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 14,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 15,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 16,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 17,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 18,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 19,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 20,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 21,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 22,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 23,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 24,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 25,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 26,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 27,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 28,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 29,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 30,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	},
+	{
+		"validator_index": 31,
+		"attacker_start_slot": 1,
+		"attacker_end_slot": 1000
+	}
+	],
+	"block": {
+		"delay_enable": true,
+		"broad_cast_delay": 15000,
+		"modify_enable": false
+	},
+	"attest": {
+		"delay_enable": false,
+		"broad_cast_delay": 40000,
+		"modify_enable": false
+	}
+}

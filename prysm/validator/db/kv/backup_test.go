@@ -88,15 +88,13 @@ func TestStore_NestedBackup(t *testing.T) {
 	require.NoError(t, err)
 	require.DeepEqual(t, root[:], genesisRoot)
 
-	signingRoot32 := [32]byte{'C'}
-
 	hist, err := backedDB.AttestationHistoryForPubKey(context.Background(), keys[0])
 	require.NoError(t, err)
 	require.DeepEqual(t, &AttestationRecord{
 		PubKey:      keys[0],
 		Source:      10,
 		Target:      0,
-		SigningRoot: signingRoot32[:],
+		SigningRoot: [32]byte{'C'},
 	}, hist[0])
 
 	hist, err = backedDB.AttestationHistoryForPubKey(context.Background(), keys[1])
@@ -105,7 +103,7 @@ func TestStore_NestedBackup(t *testing.T) {
 		PubKey:      keys[1],
 		Source:      10,
 		Target:      0,
-		SigningRoot: signingRoot32[:],
+		SigningRoot: [32]byte{'C'},
 	}, hist[0])
 
 	ep, exists, err := backedDB.LowestSignedSourceEpoch(context.Background(), keys[0])

@@ -23,9 +23,7 @@ var (
 	// ErrNilObject is returned in a constructor when the underlying object is nil.
 	ErrNilObject = errors.New("received nil object")
 	// ErrNilSignedBeaconBlock is returned when a nil signed beacon block is received.
-	ErrNilSignedBeaconBlock = errors.New("signed beacon block can't be nil")
-	// ErrNilBeaconBlock is returned when a nil beacon block is received.
-	ErrNilBeaconBlock              = errors.New("beacon block can't be nil")
+	ErrNilSignedBeaconBlock        = errors.New("signed beacon block can't be nil")
 	errNonBlindedSignedBeaconBlock = errors.New("can only build signed beacon block from blinded format")
 )
 
@@ -65,7 +63,7 @@ func NewSignedBeaconBlock(i interface{}) (interfaces.SignedBeaconBlock, error) {
 	case *eth.SignedBlindedBeaconBlockDeneb:
 		return initBlindedSignedBlockFromProtoDeneb(b)
 	case *eth.GenericSignedBeaconBlock_BlindedDeneb:
-		return initBlindedSignedBlockFromProtoDeneb(b.BlindedDeneb)
+		return initBlindedSignedBlockFromProtoDeneb(b.BlindedDeneb.SignedBlindedBlock)
 	default:
 		return nil, errors.Wrapf(ErrUnsupportedSignedBeaconBlock, "unable to create block from type %T", i)
 	}
@@ -107,7 +105,7 @@ func NewBeaconBlock(i interface{}) (interfaces.ReadOnlyBeaconBlock, error) {
 	case *eth.BlindedBeaconBlockDeneb:
 		return initBlindedBlockFromProtoDeneb(b)
 	case *eth.GenericBeaconBlock_BlindedDeneb:
-		return initBlindedBlockFromProtoDeneb(b.BlindedDeneb)
+		return initBlindedBlockFromProtoDeneb(b.BlindedDeneb.Block)
 	default:
 		return nil, errors.Wrapf(errUnsupportedBeaconBlock, "unable to create block from type %T", i)
 	}

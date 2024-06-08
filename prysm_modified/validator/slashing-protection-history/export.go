@@ -1,6 +1,7 @@
 package history
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/v4/monitoring/progress"
 	"github.com/prysmaticlabs/prysm/v4/validator/db"
@@ -156,8 +158,8 @@ func signedAttestationsByPubKey(ctx context.Context, validatorDB db.Database, pu
 			}
 		}
 		var root string
-		if len(att.SigningRoot) != 0 {
-			root, err = rootToHexString(att.SigningRoot)
+		if !bytes.Equal(att.SigningRoot[:], params.BeaconConfig().ZeroHash[:]) {
+			root, err = rootToHexString(att.SigningRoot[:])
 			if err != nil {
 				return nil, errors.Wrap(err, "could not convert signing root to hex string")
 			}

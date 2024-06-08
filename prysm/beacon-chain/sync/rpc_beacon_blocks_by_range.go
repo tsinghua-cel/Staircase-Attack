@@ -14,7 +14,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
 	pb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"go.opencensus.io/trace"
 )
 
@@ -48,7 +47,7 @@ func (s *Service) beaconBlocksByRangeRPCHandler(ctx context.Context, msg interfa
 		trace.Int64Attribute("start", int64(rp.start)), // lint:ignore uintcast -- This conversion is OK for tracing.
 		trace.Int64Attribute("end", int64(rp.end)),     // lint:ignore uintcast -- This conversion is OK for tracing.
 		trace.Int64Attribute("count", int64(m.Count)),
-		trace.StringAttribute("peer", stream.Conn().RemotePeer().String()),
+		trace.StringAttribute("peer", stream.Conn().RemotePeer().Pretty()),
 		trace.Int64Attribute("remaining_capacity", remainingBucketCapacity),
 	)
 
@@ -96,7 +95,7 @@ func validateRangeRequest(r *pb.BeaconBlocksByRangeRequest, current primitives.S
 		start: r.StartSlot,
 		size:  r.Count,
 	}
-	maxRequest := params.MaxRequestBlock(slots.ToEpoch(current))
+	maxRequest := params.BeaconNetworkConfig().MaxRequestBlocks
 	// Ensure all request params are within appropriate bounds
 	if rp.size == 0 || rp.size > maxRequest {
 		return rangeParams{}, p2ptypes.ErrInvalidRequest
@@ -110,7 +109,7 @@ func validateRangeRequest(r *pb.BeaconBlocksByRangeRequest, current primitives.S
 	if rp.start > maxStart {
 		return rangeParams{}, p2ptypes.ErrInvalidRequest
 	}
-	rp.end, err = rp.start.SafeAdd(rp.size - 1)
+	rp.end, err = rp.start.SafeAdd((rp.size - 1))
 	if err != nil {
 		return rangeParams{}, p2ptypes.ErrInvalidRequest
 	}

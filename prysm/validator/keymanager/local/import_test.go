@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpbservice "github.com/prysmaticlabs/prysm/v4/proto/eth/service"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	mock "github.com/prysmaticlabs/prysm/v4/validator/accounts/testing"
@@ -124,7 +125,7 @@ func TestLocalKeymanager_ImportKeystores(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, numKeystores, len(statuses))
 		for _, status := range statuses {
-			require.Equal(t, keymanager.StatusImported, status.Status)
+			require.Equal(t, ethpbservice.ImportedKeystoreStatus_IMPORTED, status.Status)
 		}
 		require.LogsContain(t, hook, "Successfully imported validator key(s)")
 	})
@@ -145,7 +146,7 @@ func TestLocalKeymanager_ImportKeystores(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, numKeystores, len(statuses))
 		for _, status := range statuses {
-			require.Equal(t, keymanager.StatusImported, status.Status)
+			require.Equal(t, ethpbservice.ImportedKeystoreStatus_IMPORTED, status.Status)
 		}
 		require.LogsContain(t, hook, "Successfully imported validator key(s)")
 	})
@@ -176,17 +177,17 @@ func TestLocalKeymanager_ImportKeystores(t *testing.T) {
 		require.Equal(t, len(keystores), len(statuses))
 		require.Equal(
 			t,
-			keymanager.StatusImported,
+			ethpbservice.ImportedKeystoreStatus_IMPORTED,
 			statuses[0].Status,
 		)
 		require.Equal(
 			t,
-			keymanager.StatusDuplicate,
+			ethpbservice.ImportedKeystoreStatus_DUPLICATE,
 			statuses[1].Status,
 		)
 		require.Equal(
 			t,
-			keymanager.StatusError,
+			ethpbservice.ImportedKeystoreStatus_ERROR,
 			statuses[2].Status,
 		)
 		require.Equal(
@@ -231,12 +232,12 @@ func TestLocalKeymanager_ImportKeystores(t *testing.T) {
 		require.Equal(t, len(keystores), len(statuses))
 		require.Equal(
 			t,
-			keymanager.StatusDuplicate,
+			ethpbservice.ImportedKeystoreStatus_DUPLICATE,
 			statuses[0].Status,
 		)
 		require.Equal(
 			t,
-			keymanager.StatusError,
+			ethpbservice.ImportedKeystoreStatus_ERROR,
 			statuses[1].Status,
 		)
 		require.Equal(

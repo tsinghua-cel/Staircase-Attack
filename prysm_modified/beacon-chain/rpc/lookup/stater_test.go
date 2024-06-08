@@ -74,8 +74,8 @@ func TestGetState(t *testing.T) {
 		require.NoError(t, db.SaveGenesisBlockRoot(ctx, r))
 		require.NoError(t, db.SaveState(ctx, bs, r))
 
-		cc := &mockstategen.CanonicalChecker{Is: true}
-		cs := &mockstategen.CurrentSlotter{Slot: bs.Slot() + 1}
+		cc := &mockstategen.MockCanonicalChecker{Is: true}
+		cs := &mockstategen.MockCurrentSlotter{Slot: bs.Slot() + 1}
 		ch := stategen.NewCanonicalHistory(db, cc, cs)
 		currentSlot := primitives.Slot(0)
 		p := BeaconDbStater{
@@ -93,8 +93,8 @@ func TestGetState(t *testing.T) {
 	})
 
 	t.Run("finalized", func(t *testing.T) {
-		stateGen := mockstategen.NewService()
-		replayer := mockstategen.NewReplayerBuilder()
+		stateGen := mockstategen.NewMockService()
+		replayer := mockstategen.NewMockReplayerBuilder()
 		replayer.SetMockStateForSlot(newBeaconState, params.BeaconConfig().SlotsPerEpoch*10)
 		stateGen.StatesByRoot[stateRoot] = newBeaconState
 
@@ -117,8 +117,8 @@ func TestGetState(t *testing.T) {
 	})
 
 	t.Run("justified", func(t *testing.T) {
-		stateGen := mockstategen.NewService()
-		replayer := mockstategen.NewReplayerBuilder()
+		stateGen := mockstategen.NewMockService()
+		replayer := mockstategen.NewMockReplayerBuilder()
 		replayer.SetMockStateForSlot(newBeaconState, params.BeaconConfig().SlotsPerEpoch*10)
 		stateGen.StatesByRoot[stateRoot] = newBeaconState
 
@@ -144,7 +144,7 @@ func TestGetState(t *testing.T) {
 		hex := "0x" + strings.Repeat("0", 63) + "1"
 		root, err := hexutil.Decode(hex)
 		require.NoError(t, err)
-		stateGen := mockstategen.NewService()
+		stateGen := mockstategen.NewMockService()
 		stateGen.StatesByRoot[bytesutil.ToBytes32(root)] = newBeaconState
 
 		p := BeaconDbStater{
@@ -162,7 +162,7 @@ func TestGetState(t *testing.T) {
 	t.Run("root", func(t *testing.T) {
 		stateId, err := hexutil.Decode("0x" + strings.Repeat("0", 63) + "1")
 		require.NoError(t, err)
-		stateGen := mockstategen.NewService()
+		stateGen := mockstategen.NewMockService()
 		stateGen.StatesByRoot[bytesutil.ToBytes32(stateId)] = newBeaconState
 
 		p := BeaconDbStater{
@@ -196,7 +196,7 @@ func TestGetState(t *testing.T) {
 				},
 				State: newBeaconState,
 			},
-			ReplayerBuilder: mockstategen.NewReplayerBuilder(mockstategen.WithMockState(newBeaconState)),
+			ReplayerBuilder: mockstategen.NewMockReplayerBuilder(mockstategen.WithMockState(newBeaconState)),
 		}
 
 		s, err := p.State(ctx, []byte(strconv.FormatUint(uint64(headSlot), 10)))
@@ -420,7 +420,7 @@ func TestStateBySlot_AfterHeadSlot(t *testing.T) {
 	require.NoError(t, err)
 	currentSlot := primitives.Slot(102)
 	mock := &chainMock.ChainService{State: headSt, Slot: &currentSlot}
-	mockReplayer := mockstategen.NewReplayerBuilder()
+	mockReplayer := mockstategen.NewMockReplayerBuilder()
 	mockReplayer.SetMockStateForSlot(slotSt, 101)
 	p := BeaconDbStater{ChainInfoFetcher: mock, GenesisTimeFetcher: mock, ReplayerBuilder: mockReplayer}
 	st, err := p.StateBySlot(context.Background(), 101)

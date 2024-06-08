@@ -1,9 +1,8 @@
 package beacon_api
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -19,38 +18,35 @@ import (
 
 const stringPubKey = "0x8000091c2ae64ee414a54c1cc1fc67dec663408bc636cb86756e0200e41a75c8f86603f104f02c856983d2783116be13"
 
-func getPubKeyAndReqBuffer(t *testing.T) ([]byte, *bytes.Buffer) {
+func getPubKeyAndURL(t *testing.T) ([]byte, string) {
+	baseUrl := "/eth/v1/beacon/states/head/validators"
+	url := fmt.Sprintf("%s?id=%s", baseUrl, stringPubKey)
+
 	pubKey, err := hexutil.Decode(stringPubKey)
 	require.NoError(t, err)
-	req := beacon.GetValidatorsRequest{
-		Ids:      []string{stringPubKey},
-		Statuses: []string{},
-	}
-	reqBytes, err := json.Marshal(req)
-	require.NoError(t, err)
-	return pubKey, bytes.NewBuffer(reqBytes)
+
+	return pubKey, url
 }
 
 func TestIndex_Nominal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pubKey, reqBuffer := getPubKeyAndReqBuffer(t)
+	pubKey, url := getPubKeyAndURL(t)
 	ctx := context.Background()
 
 	stateValidatorsResponseJson := beacon.GetValidatorsResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
-		"/eth/v1/beacon/states/head/validators",
-		nil,
-		reqBuffer,
+		url,
 		&stateValidatorsResponseJson,
 	).Return(
 		nil,
+		nil,
 	).SetArg(
-		4,
+		2,
 		beacon.GetValidatorsResponse{
 			Data: []*beacon.ValidatorContainer{
 				{
@@ -85,22 +81,21 @@ func TestIndex_UnexistingValidator(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pubKey, reqBuffer := getPubKeyAndReqBuffer(t)
+	pubKey, url := getPubKeyAndURL(t)
 	ctx := context.Background()
 
 	stateValidatorsResponseJson := beacon.GetValidatorsResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
-		"/eth/v1/beacon/states/head/validators",
-		nil,
-		reqBuffer,
+		url,
 		&stateValidatorsResponseJson,
 	).Return(
 		nil,
+		nil,
 	).SetArg(
-		4,
+		2,
 		beacon.GetValidatorsResponse{
 			Data: []*beacon.ValidatorContainer{},
 		},
@@ -127,22 +122,21 @@ func TestIndex_BadIndexError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pubKey, reqBuffer := getPubKeyAndReqBuffer(t)
+	pubKey, url := getPubKeyAndURL(t)
 	ctx := context.Background()
 
 	stateValidatorsResponseJson := beacon.GetValidatorsResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
-		"/eth/v1/beacon/states/head/validators",
-		nil,
-		reqBuffer,
+		url,
 		&stateValidatorsResponseJson,
 	).Return(
 		nil,
+		nil,
 	).SetArg(
-		4,
+		2,
 		beacon.GetValidatorsResponse{
 			Data: []*beacon.ValidatorContainer{
 				{
@@ -176,19 +170,18 @@ func TestIndex_JsonResponseError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pubKey, reqBuffer := getPubKeyAndReqBuffer(t)
+	pubKey, url := getPubKeyAndURL(t)
 	ctx := context.Background()
 
 	stateValidatorsResponseJson := beacon.GetValidatorsResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
-		"/eth/v1/beacon/states/head/validators",
-		nil,
-		reqBuffer,
+		url,
 		&stateValidatorsResponseJson,
 	).Return(
+		nil,
 		errors.New("some specific json error"),
 	).Times(1)
 

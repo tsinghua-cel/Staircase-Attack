@@ -24,11 +24,29 @@ import (
 func ProcessAttestationsNoVerifySignature(
 	ctx context.Context,
 	beaconState state.BeaconState,
+	b interfaces.ReadOnlySignedBeaconBlock,
+) (state.BeaconState, error) {
+	if err := consensusblocks.BeaconBlockIsNil(b); err != nil {
+		return nil, err
+	}
+	body := b.Block().Body()
+	totalBalance, err := helpers.TotalActiveBalance(beaconState)
+	if err != nil {
+		return nil, err
+	}
+	for idx, att := range body.Attestations() {
+		beaconState, err = ProcessAttestationNoVerifySignature(ctx, beaconState, att, totalBalance)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not verify attestation at index %d in block", idx)
+		}
+	}
+	return beaconState, nil
+}
+func ProcessAttestationsNoVerifySignatureNormal(
+	ctx context.Context,
+	beaconState state.BeaconState,
 	b interfaces.ReadOnlyBeaconBlock,
 ) (state.BeaconState, error) {
-	if b == nil || b.IsNil() {
-		return nil, consensusblocks.ErrNilBeaconBlock
-	}
 	body := b.Body()
 	totalBalance, err := helpers.TotalActiveBalance(beaconState)
 	if err != nil {

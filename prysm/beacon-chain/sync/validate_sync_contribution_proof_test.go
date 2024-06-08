@@ -28,7 +28,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
 	mockSync "github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/initial-sync/testing"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/verification"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
@@ -178,9 +177,7 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 				s.cfg.stateGen = stategen.New(database, doublylinkedtree.New())
 				s.cfg.beaconDB = database
 				s.initCaches()
-				s.cfg.chain = &mockChain.ChainService{
-					Genesis: time.Now(),
-				}
+				s.cfg.chain = &mockChain.ChainService{}
 				msg.Message.Contribution.BlockRoot = headRoot[:]
 				msg.Message.Contribution.AggregationBits.SetBitAt(1, true)
 
@@ -219,9 +216,7 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 				s.cfg.stateGen = stategen.New(database, doublylinkedtree.New())
 				s.cfg.beaconDB = database
 				s.initCaches()
-				s.cfg.chain = &mockChain.ChainService{
-					Genesis: time.Now(),
-				}
+				s.cfg.chain = &mockChain.ChainService{}
 				msg.Message.Contribution.BlockRoot = headRoot[:]
 				msg.Message.Contribution.AggregationBits.SetBitAt(1, true)
 				msg.Message.Contribution.SubcommitteeIndex = 20
@@ -260,9 +255,7 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 				s.cfg.stateGen = stategen.New(database, doublylinkedtree.New())
 				s.cfg.beaconDB = database
 				s.initCaches()
-				s.cfg.chain = &mockChain.ChainService{
-					Genesis: time.Now(),
-				}
+				s.cfg.chain = &mockChain.ChainService{}
 				msg.Message.Contribution.BlockRoot = headRoot[:]
 				incorrectProof := [96]byte{0xBB}
 				msg.Message.SelectionProof = incorrectProof[:]
@@ -302,9 +295,7 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 				s.cfg.stateGen = stategen.New(database, doublylinkedtree.New())
 				s.cfg.beaconDB = database
 				s.initCaches()
-				s.cfg.chain = &mockChain.ChainService{
-					Genesis: time.Now(),
-				}
+				s.cfg.chain = &mockChain.ChainService{}
 				msg.Message.Contribution.BlockRoot = headRoot[:]
 				hState, err := database.State(context.Background(), headRoot)
 				assert.NoError(t, err)
@@ -385,7 +376,6 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 				}
 				subCommitteeSize := params.BeaconConfig().SyncCommitteeSize / params.BeaconConfig().SyncCommitteeSubnetCount
 				s.cfg.chain = &mockChain.ChainService{
-					Genesis:              time.Now(),
 					SyncCommitteeIndices: []primitives.CommitteeIndex{primitives.CommitteeIndex(msg.Message.Contribution.SubcommitteeIndex * subCommitteeSize)},
 				}
 				msg.Message.Contribution.AggregationBits.SetBitAt(1, true)
@@ -465,7 +455,6 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 					SyncCommitteeIndices:     []primitives.CommitteeIndex{primitives.CommitteeIndex(msg.Message.Contribution.SubcommitteeIndex * subCommitteeSize)},
 					PublicKey:                bytesutil.ToBytes48(pubkey),
 					SyncSelectionProofDomain: d,
-					Genesis:                  time.Now(),
 				}
 
 				s.initCaches()
@@ -545,7 +534,6 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 				}
 				s.cfg.chain = &mockChain.ChainService{
 					SyncCommitteeIndices: []primitives.CommitteeIndex{1},
-					Genesis:              time.Now(),
 				}
 
 				s.initCaches()
@@ -628,7 +616,6 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 					SyncSelectionProofDomain:    d,
 					SyncContributionProofDomain: cd,
 					SyncCommitteeDomain:         make([]byte, 32),
-					Genesis:                     time.Now(),
 				}
 				s.initCaches()
 				gt := time.Now().Add(-time.Second * time.Duration(params.BeaconConfig().SecondsPerSlot) * time.Duration(msg.Message.Contribution.Slot))
@@ -722,7 +709,6 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 					SyncContributionProofDomain: cd,
 					SyncCommitteeDomain:         d,
 					SyncCommitteePubkeys:        pubkeys,
-					Genesis:                     time.Now(),
 				}
 				s.initCaches()
 				gt := time.Now().Add(-time.Second * time.Duration(params.BeaconConfig().SecondsPerSlot) * time.Duration(msg.Message.Contribution.Slot))
@@ -818,7 +804,6 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 					SyncContributionProofDomain: cd,
 					SyncCommitteeDomain:         d,
 					SyncCommitteePubkeys:        pubkeys,
-					Genesis:                     time.Now(),
 				}
 				gt := time.Now().Add(-time.Second * time.Duration(params.BeaconConfig().SecondsPerSlot) * time.Duration(msg.Message.Contribution.Slot))
 
@@ -851,12 +836,10 @@ func TestService_ValidateSyncContributionAndProof(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			cw := startup.NewClockSynchronizer()
-			svc := NewService(ctx, append([]Option{WithClockWaiter(cw), WithStateNotifier(chainService.StateNotifier())}, tt.svcopts...)...)
+			svc := NewService(ctx, append([]Option{WithClockWaiter(cw)}, tt.svcopts...)...)
 			var clock *startup.Clock
 			svc, clock = tt.setupSvc(svc, tt.args.msg)
 			require.NoError(t, cw.SetClock(clock))
-			svc.verifierWaiter = verification.NewInitializerWaiter(cw, chainService.ForkChoiceStore, svc.cfg.stateGen)
-
 			go svc.Start()
 			marshalledObj, err := tt.args.msg.MarshalSSZ()
 			assert.NoError(t, err)

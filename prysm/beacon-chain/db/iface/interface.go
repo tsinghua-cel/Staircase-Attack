@@ -11,11 +11,9 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/filters"
 	slashertypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/slasher/types"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/monitoring/backup"
-	"github.com/prysmaticlabs/prysm/v4/proto/dbval"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
@@ -57,9 +55,13 @@ type ReadOnlyDatabase interface {
 	FeeRecipientByValidatorID(ctx context.Context, id primitives.ValidatorIndex) (common.Address, error)
 	RegistrationByValidatorID(ctx context.Context, id primitives.ValidatorIndex) (*ethpb.ValidatorRegistrationV1, error)
 
+	// Blob operations.
+	BlobSidecarsByRoot(ctx context.Context, beaconBlockRoot [32]byte, indices ...uint64) ([]*ethpb.BlobSidecar, error)
+	BlobSidecarsBySlot(ctx context.Context, slot primitives.Slot, indices ...uint64) ([]*ethpb.BlobSidecar, error)
+
 	// origin checkpoint sync support
 	OriginCheckpointBlockRoot(ctx context.Context) ([32]byte, error)
-	BackfillStatus(context.Context) (*dbval.BackfillStatus, error)
+	BackfillBlockRoot(ctx context.Context) ([32]byte, error)
 }
 
 // NoHeadAccessDatabase defines a struct without access to chain head data.
@@ -70,7 +72,6 @@ type NoHeadAccessDatabase interface {
 	DeleteBlock(ctx context.Context, root [32]byte) error
 	SaveBlock(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) error
 	SaveBlocks(ctx context.Context, blocks []interfaces.ReadOnlySignedBeaconBlock) error
-	SaveROBlocks(ctx context.Context, blks []blocks.ROBlock, cache bool) error
 	SaveGenesisBlockRoot(ctx context.Context, blockRoot [32]byte) error
 	// State related methods.
 	SaveState(ctx context.Context, state state.ReadOnlyBeaconState, blockRoot [32]byte) error
@@ -93,6 +94,10 @@ type NoHeadAccessDatabase interface {
 	SaveFeeRecipientsByValidatorIDs(ctx context.Context, ids []primitives.ValidatorIndex, addrs []common.Address) error
 	SaveRegistrationsByValidatorIDs(ctx context.Context, ids []primitives.ValidatorIndex, regs []*ethpb.ValidatorRegistrationV1) error
 
+	// Blob operations.
+	SaveBlobSidecar(ctx context.Context, sidecars []*ethpb.BlobSidecar) error
+	DeleteBlobSidecar(ctx context.Context, beaconBlockRoot [32]byte) error
+
 	CleanUpDirtyStates(ctx context.Context, slotsPerArchivedPoint primitives.Slot) error
 }
 
@@ -109,10 +114,9 @@ type HeadAccessDatabase interface {
 	SaveGenesisData(ctx context.Context, state state.BeaconState) error
 	EnsureEmbeddedGenesis(ctx context.Context) error
 
-	// Support for checkpoint sync and backfill.
+	// initialization method needed for origin checkpoint sync
 	SaveOrigin(ctx context.Context, serState, serBlock []byte) error
-	SaveBackfillStatus(context.Context, *dbval.BackfillStatus) error
-	BackfillFinalizedIndex(ctx context.Context, blocks []blocks.ROBlock, finalizedChildRoot [32]byte) error
+	SaveBackfillBlockRoot(ctx context.Context, blockRoot [32]byte) error
 }
 
 // SlasherDatabase interface for persisting data related to detecting slashable offenses on Ethereum.
@@ -166,7 +170,7 @@ type SlasherDatabase interface {
 // Database interface with full access.
 type Database interface {
 	io.Closer
-	backup.Exporter
+	backup.BackupExporter
 	HeadAccessDatabase
 
 	DatabasePath() string

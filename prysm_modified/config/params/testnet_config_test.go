@@ -1,6 +1,7 @@
 package params_test
 
 import (
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -10,6 +11,13 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
+
+func testnetConfigFilePath(t *testing.T, network string) string {
+	fPath, err := bazel.Runfile("external/eth2_networks")
+	require.NoError(t, err)
+	configFilePath := path.Join(fPath, "shared", network, "config.yaml")
+	return configFilePath
+}
 
 func TestE2EConfigParity(t *testing.T) {
 	params.SetupTestConfigCleanup(t)

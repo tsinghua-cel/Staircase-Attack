@@ -153,7 +153,9 @@ func TestValidatePhrase(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, errIncorrectPhrase.Error(), err)
 	})
-	t.Run("any letter case", func(t *testing.T) {
-		assert.NoError(t, ValidatePhrase("Wanted Phrase", wantedPhrase))
+	t.Run("wrong letter case", func(t *testing.T) {
+		err := ValidatePhrase("Wanted Phrase", wantedPhrase)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, errIncorrectPhrase.Error(), err)
 	})
 }

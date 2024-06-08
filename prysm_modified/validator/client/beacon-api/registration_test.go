@@ -66,14 +66,15 @@ func TestRegistration_Valid(t *testing.T) {
 	marshalledJsonRegistrations, err := json.Marshal(jsonRegistrations)
 	require.NoError(t, err)
 
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+	jsonRestHandler.EXPECT().PostRestJson(
 		context.Background(),
 		"/eth/v1/validator/register_validator",
 		nil,
 		bytes.NewBuffer(marshalledJsonRegistrations),
 		nil,
 	).Return(
+		nil,
 		nil,
 	).Times(1)
 
@@ -141,18 +142,20 @@ func TestRegistration_BadRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+	jsonRestHandler.EXPECT().PostRestJson(
 		context.Background(),
 		"/eth/v1/validator/register_validator",
 		nil,
 		gomock.Any(),
 		nil,
 	).Return(
+		nil,
 		errors.New("foo error"),
 	).Times(1)
 
 	validatorClient := &beaconApiValidatorClient{jsonRestHandler: jsonRestHandler}
 	_, err := validatorClient.SubmitValidatorRegistrations(context.Background(), &ethpb.SignedValidatorRegistrationsV1{})
+	assert.ErrorContains(t, "failed to send POST data to `/eth/v1/validator/register_validator` REST endpoint", err)
 	assert.ErrorContains(t, "foo error", err)
 }

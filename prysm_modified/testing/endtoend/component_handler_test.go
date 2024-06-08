@@ -192,13 +192,7 @@ func (c *componentHandler) setup() {
 	if multiClientActive {
 		lighthouseNodes = components.NewLighthouseBeaconNodes(config)
 		g.Go(func() error {
-			wantedComponents := []e2etypes.ComponentRunner{eth1Nodes, bootNode, beaconNodes}
-			if config.UseBuilder {
-				wantedComponents = append(wantedComponents, builders)
-			} else {
-				wantedComponents = append(wantedComponents, proxies)
-			}
-			if err := helpers.ComponentsStarted(ctx, wantedComponents); err != nil {
+			if err := helpers.ComponentsStarted(ctx, []e2etypes.ComponentRunner{eth1Nodes, proxies, bootNode, beaconNodes}); err != nil {
 				return errors.Wrap(err, "lighthouse beacon nodes require proxies, execution, beacon and boot node to run")
 			}
 			lighthouseNodes.SetENR(bootNode.ENR())

@@ -583,27 +583,75 @@ func testProposeBlock(t *testing.T, graffiti []byte) {
 			},
 		},
 		{
-			name:    "deneb block",
+			name:    "deneb block and blobs",
 			version: version.Deneb,
 			block: &ethpb.GenericBeaconBlock{
 				Block: &ethpb.GenericBeaconBlock_Deneb{
-					Deneb: func() *ethpb.BeaconBlockContentsDeneb {
-						blk := util.NewBeaconBlockContentsDeneb()
-						blk.Block.Block.Body.Graffiti = graffiti
-						return &ethpb.BeaconBlockContentsDeneb{Block: blk.Block.Block, KzgProofs: blk.KzgProofs, Blobs: blk.Blobs}
+					Deneb: func() *ethpb.BeaconBlockAndBlobsDeneb {
+						blk := util.NewBeaconBlockDeneb()
+						blk.Block.Body.Graffiti = graffiti
+						return &ethpb.BeaconBlockAndBlobsDeneb{
+							Block: blk.Block,
+							Blobs: []*ethpb.BlobSidecar{
+								{
+									BlockRoot:       bytesutil.PadTo([]byte("blockRoot"), 32),
+									Index:           1,
+									Slot:            2,
+									BlockParentRoot: bytesutil.PadTo([]byte("blockParentRoot"), 32),
+									ProposerIndex:   3,
+									Blob:            bytesutil.PadTo([]byte("blob"), fieldparams.BlobLength),
+									KzgCommitment:   bytesutil.PadTo([]byte("kzgCommitment"), 48),
+									KzgProof:        bytesutil.PadTo([]byte("kzgPRoof"), 48),
+								},
+								{
+									BlockRoot:       bytesutil.PadTo([]byte("blockRoot1"), 32),
+									Index:           4,
+									Slot:            5,
+									BlockParentRoot: bytesutil.PadTo([]byte("blockParentRoot1"), 32),
+									ProposerIndex:   6,
+									Blob:            bytesutil.PadTo([]byte("blob1"), fieldparams.BlobLength),
+									KzgCommitment:   bytesutil.PadTo([]byte("kzgCommitment1"), 48),
+									KzgProof:        bytesutil.PadTo([]byte("kzgPRoof1"), 48),
+								},
+							},
+						}
 					}(),
 				},
 			},
 		},
 		{
-			name:    "deneb blind block",
+			name:    "deneb blind block and blobs",
 			version: version.Deneb,
 			block: &ethpb.GenericBeaconBlock{
 				Block: &ethpb.GenericBeaconBlock_BlindedDeneb{
-					BlindedDeneb: func() *ethpb.BlindedBeaconBlockDeneb {
+					BlindedDeneb: func() *ethpb.BlindedBeaconBlockAndBlobsDeneb {
 						blk := util.NewBlindedBeaconBlockDeneb()
 						blk.Message.Body.Graffiti = graffiti
-						return blk.Message
+						return &ethpb.BlindedBeaconBlockAndBlobsDeneb{
+							Block: blk.Message,
+							Blobs: []*ethpb.BlindedBlobSidecar{
+								{
+									BlockRoot:       bytesutil.PadTo([]byte("blockRoot"), 32),
+									Index:           1,
+									Slot:            2,
+									BlockParentRoot: bytesutil.PadTo([]byte("blockParentRoot"), 32),
+									ProposerIndex:   3,
+									BlobRoot:        bytesutil.PadTo([]byte("blobRoot"), 32),
+									KzgCommitment:   bytesutil.PadTo([]byte("kzgCommitment"), 48),
+									KzgProof:        bytesutil.PadTo([]byte("kzgPRoof"), 48),
+								},
+								{
+									BlockRoot:       bytesutil.PadTo([]byte("blockRoot1"), 32),
+									Index:           4,
+									Slot:            5,
+									BlockParentRoot: bytesutil.PadTo([]byte("blockParentRoot1"), 32),
+									ProposerIndex:   6,
+									BlobRoot:        bytesutil.PadTo([]byte("blobRoot1"), 32),
+									KzgCommitment:   bytesutil.PadTo([]byte("kzgCommitment1"), 48),
+									KzgProof:        bytesutil.PadTo([]byte("kzgPRoof1"), 48),
+								},
+							},
+						}
 					}(),
 				},
 			},
@@ -642,12 +690,31 @@ func testProposeBlock(t *testing.T, graffiti []byte) {
 			var sentBlock interfaces.ReadOnlySignedBeaconBlock
 			var err error
 
+			if tt.version == version.Deneb {
+				m.validatorClient.EXPECT().DomainData(
+					gomock.Any(), // ctx
+					gomock.Any(), // epoch
+				).Return(&ethpb.DomainResponse{SignatureDomain: make([]byte, 32)}, nil /*err*/)
+				m.validatorClient.EXPECT().DomainData(
+					gomock.Any(), // ctx
+					gomock.Any(), // epoch
+				).Return(&ethpb.DomainResponse{SignatureDomain: make([]byte, 32)}, nil /*err*/)
+			}
+
 			m.validatorClient.EXPECT().ProposeBeaconBlock(
 				gomock.Any(), // ctx
 				gomock.AssignableToTypeOf(&ethpb.GenericSignedBeaconBlock{}),
 			).DoAndReturn(func(ctx context.Context, block *ethpb.GenericSignedBeaconBlock) (*ethpb.ProposeResponse, error) {
 				sentBlock, err = blocktest.NewSignedBeaconBlockFromGeneric(block)
-				require.NoError(t, err)
+				assert.NoError(t, err, "Unexpected error unwrapping block")
+				if tt.version == version.Deneb {
+					switch {
+					case tt.name == "deneb block and blobs":
+						require.Equal(t, 2, len(block.GetDeneb().Blobs))
+					case tt.name == "deneb blind block and blobs":
+						require.Equal(t, 2, len(block.GetBlindedDeneb().SignedBlindedBlobSidecars))
+					}
+				}
 				return &ethpb.ProposeResponse{BlockRoot: make([]byte, 32)}, nil
 			})
 
@@ -896,7 +963,7 @@ func TestGetGraffiti_Ok(t *testing.T) {
 					},
 				},
 			},
-			want: bytesutil.PadTo([]byte{'b'}, 32),
+			want: []byte{'b'},
 		},
 		{name: "use default file graffiti",
 			v: &validator{
@@ -905,7 +972,7 @@ func TestGetGraffiti_Ok(t *testing.T) {
 					Default: "c",
 				},
 			},
-			want: bytesutil.PadTo([]byte{'c'}, 32),
+			want: []byte{'c'},
 		},
 		{name: "use random file graffiti",
 			v: &validator{
@@ -915,7 +982,7 @@ func TestGetGraffiti_Ok(t *testing.T) {
 					Default: "c",
 				},
 			},
-			want: bytesutil.PadTo([]byte{'d'}, 32),
+			want: []byte{'d'},
 		},
 		{name: "use validator file graffiti, has validator",
 			v: &validator{
@@ -929,7 +996,7 @@ func TestGetGraffiti_Ok(t *testing.T) {
 					},
 				},
 			},
-			want: bytesutil.PadTo([]byte{'g'}, 32),
+			want: []byte{'g'},
 		},
 		{name: "use validator file graffiti, none specified",
 			v: &validator{
@@ -974,7 +1041,7 @@ func TestGetGraffitiOrdered_Ok(t *testing.T) {
 			Default: "d",
 		},
 	}
-	for _, want := range [][]byte{bytesutil.PadTo([]byte{'a'}, 32), bytesutil.PadTo([]byte{'b'}, 32), bytesutil.PadTo([]byte{'c'}, 32), bytesutil.PadTo([]byte{'d'}, 32), bytesutil.PadTo([]byte{'d'}, 32)} {
+	for _, want := range [][]byte{{'a'}, {'b'}, {'c'}, {'d'}, {'d'}} {
 		got, err := v.getGraffiti(context.Background(), pubKey)
 		require.NoError(t, err)
 		require.DeepEqual(t, want, got)

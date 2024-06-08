@@ -324,11 +324,11 @@ func UpgradeState(ctx context.Context, state state.BeaconState) (state.BeaconSta
 }
 
 // VerifyOperationLengths verifies that block operation lengths are valid.
-func VerifyOperationLengths(_ context.Context, state state.BeaconState, b interfaces.ReadOnlyBeaconBlock) (state.BeaconState, error) {
-	if b == nil || b.IsNil() {
-		return nil, blocks.ErrNilBeaconBlock
+func VerifyOperationLengths(_ context.Context, state state.BeaconState, b interfaces.ReadOnlySignedBeaconBlock) (state.BeaconState, error) {
+	if err := blocks.BeaconBlockIsNil(b); err != nil {
+		return nil, err
 	}
-	body := b.Body()
+	body := b.Block().Body()
 
 	if uint64(len(body.ProposerSlashings())) > params.BeaconConfig().MaxProposerSlashings {
 		return nil, fmt.Errorf(

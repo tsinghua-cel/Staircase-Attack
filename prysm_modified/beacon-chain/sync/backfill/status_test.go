@@ -25,7 +25,7 @@ type mockBackfillDB struct {
 	block                     func(ctx context.Context, blockRoot [32]byte) (interfaces.ReadOnlySignedBeaconBlock, error)
 }
 
-var _ DB = &mockBackfillDB{}
+var _ BackfillDB = &mockBackfillDB{}
 
 func (db *mockBackfillDB) SaveBackfillBlockRoot(ctx context.Context, blockRoot [32]byte) error {
 	if db.saveBackfillBlockRoot != nil {
@@ -169,7 +169,7 @@ func TestReload(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		db       DB
+		db       BackfillDB
 		err      error
 		expected *Status
 	}{

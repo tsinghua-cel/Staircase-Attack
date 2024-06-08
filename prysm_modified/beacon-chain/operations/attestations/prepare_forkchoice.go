@@ -42,7 +42,7 @@ func (s *Service) prepareForkChoiceAtts() {
 			switch slotInterval.Interval {
 			case 0:
 				duration := time.Since(t)
-				log.WithField("Duration", duration).Debug("Aggregated unaggregated attestations")
+				log.WithField("Duration", duration).Debug("aggregated unaggregated attestations")
 				batchForkChoiceAttsT1.Observe(float64(duration.Milliseconds()))
 			case 1:
 				batchForkChoiceAttsT2.Observe(float64(time.Since(t).Milliseconds()))
@@ -119,7 +119,7 @@ func (s *Service) aggregateAndSaveForkChoiceAtts(atts []*ethpb.Attestation) erro
 // This checks if the attestation has previously been aggregated for fork choice
 // return true if yes, false if no.
 func (s *Service) seen(att *ethpb.Attestation) (bool, error) {
-	attRoot, err := hash.Proto(att.Data)
+	attRoot, err := hash.HashProto(att.Data)
 	if err != nil {
 		return false, err
 	}

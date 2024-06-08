@@ -19,6 +19,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -62,11 +63,13 @@ type jsonWriter interface {
 type BlockNumber int64
 
 const (
-	SafeBlockNumber      = BlockNumber(-4)
-	FinalizedBlockNumber = BlockNumber(-3)
+	//SafeBlockNumber      = BlockNumber(-4)
+	//FinalizedBlockNumber = BlockNumber(-3)
 	LatestBlockNumber    = BlockNumber(-2)
 	PendingBlockNumber   = BlockNumber(-1)
 	EarliestBlockNumber  = BlockNumber(0)
+	SafeBlockNumber      = LatestBlockNumber
+	FinalizedBlockNumber = LatestBlockNumber
 )
 
 // UnmarshalJSON parses the given JSON fragment into a BlockNumber. It supports:
@@ -104,7 +107,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if blckNum > math.MaxInt64 {
-		return fmt.Errorf("block number larger than int64")
+		return errors.New("block number larger than int64")
 	}
 	*bn = BlockNumber(blckNum)
 	return nil
@@ -130,10 +133,10 @@ func (bn BlockNumber) String() string {
 		return "latest"
 	case PendingBlockNumber:
 		return "pending"
-	case FinalizedBlockNumber:
-		return "finalized"
-	case SafeBlockNumber:
-		return "safe"
+	//case FinalizedBlockNumber:
+	//	return "finalized"
+	//case SafeBlockNumber:
+	//	return "safe"
 	default:
 		if bn < 0 {
 			return fmt.Sprintf("<invalid %d>", bn)
@@ -154,7 +157,7 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 	err := json.Unmarshal(data, &e)
 	if err == nil {
 		if e.BlockNumber != nil && e.BlockHash != nil {
-			return fmt.Errorf("cannot specify both BlockHash and BlockNumber, choose one or the other")
+			return errors.New("cannot specify both BlockHash and BlockNumber, choose one or the other")
 		}
 		bnh.BlockNumber = e.BlockNumber
 		bnh.BlockHash = e.BlockHash
@@ -202,7 +205,7 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			if blckNum > math.MaxInt64 {
-				return fmt.Errorf("blocknumber too high")
+				return errors.New("blocknumber too high")
 			}
 			bn := BlockNumber(blckNum)
 			bnh.BlockNumber = &bn

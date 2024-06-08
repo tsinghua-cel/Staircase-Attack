@@ -6,17 +6,16 @@ import (
 
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/core"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v4/network/httputil"
+	http2 "github.com/prysmaticlabs/prysm/v4/network/http"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
-	"go.opencensus.io/trace"
 )
 
-type PerformanceRequest struct {
+type ValidatorPerformanceRequest struct {
 	PublicKeys [][]byte                    `json:"public_keys,omitempty"`
 	Indices    []primitives.ValidatorIndex `json:"indices,omitempty"`
 }
 
-type PerformanceResponse struct {
+type ValidatorPerformanceResponse struct {
 	PublicKeys                    [][]byte `json:"public_keys,omitempty"`
 	CorrectlyVotedSource          []bool   `json:"correctly_voted_source,omitempty"`
 	CorrectlyVotedTarget          []bool   `json:"correctly_voted_target,omitempty"`
@@ -29,19 +28,16 @@ type PerformanceResponse struct {
 }
 
 // GetValidatorPerformance is an HTTP handler for GetValidatorPerformance.
-func (s *Server) GetValidatorPerformance(w http.ResponseWriter, r *http.Request) {
-	ctx, span := trace.StartSpan(r.Context(), "validator.GetValidatorPerformance")
-	defer span.End()
-
-	var req PerformanceRequest
+func (vs *Server) GetValidatorPerformance(w http.ResponseWriter, r *http.Request) {
+	var req ValidatorPerformanceRequest
 	if r.Body != http.NoBody {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			handleHTTPError(w, "Could not decode request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
-	computed, err := s.CoreService.ComputeValidatorPerformance(
-		ctx,
+	computed, err := vs.CoreService.ComputeValidatorPerformance(
+		r.Context(),
 		&ethpb.ValidatorPerformanceRequest{
 			PublicKeys: req.PublicKeys,
 			Indices:    req.Indices,
@@ -51,7 +47,7 @@ func (s *Server) GetValidatorPerformance(w http.ResponseWriter, r *http.Request)
 		handleHTTPError(w, "Could not compute validator performance: "+err.Err.Error(), core.ErrorReasonToHTTP(err.Reason))
 		return
 	}
-	response := &PerformanceResponse{
+	response := &ValidatorPerformanceResponse{
 		PublicKeys:                    computed.PublicKeys,
 		CorrectlyVotedSource:          computed.CorrectlyVotedSource,
 		CorrectlyVotedTarget:          computed.CorrectlyVotedTarget, // In altair, when this is true then the attestation was definitely included.
@@ -62,13 +58,13 @@ func (s *Server) GetValidatorPerformance(w http.ResponseWriter, r *http.Request)
 		MissingValidators:             computed.MissingValidators,
 		InactivityScores:              computed.InactivityScores, // Only populated in Altair
 	}
-	httputil.WriteJson(w, response)
+	http2.WriteJson(w, response)
 }
 
 func handleHTTPError(w http.ResponseWriter, message string, code int) {
-	errJson := &httputil.DefaultJsonError{
+	errJson := &http2.DefaultErrorJson{
 		Message: message,
 		Code:    code,
 	}
-	httputil.WriteError(w, errJson)
+	http2.WriteError(w, errJson)
 }

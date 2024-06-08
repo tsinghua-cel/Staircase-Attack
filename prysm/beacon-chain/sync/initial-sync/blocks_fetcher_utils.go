@@ -23,7 +23,7 @@ import (
 // either in DB or initial sync cache.
 type forkData struct {
 	peer peer.ID
-	bwb  []blocks.BlockWithROBlobs
+	bwb  []blocks.BlockWithVerifiedBlobs
 }
 
 // nonSkippedSlotAfter checks slots after the given one in an attempt to find a non-empty future slot.

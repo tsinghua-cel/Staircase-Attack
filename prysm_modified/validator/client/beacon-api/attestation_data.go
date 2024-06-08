@@ -24,8 +24,8 @@ func (c beaconApiValidatorClient) getAttestationData(
 	query := buildURL("/eth/v1/validator/attestation_data", params)
 	produceAttestationDataResponseJson := validator.GetAttestationDataResponse{}
 
-	if err := c.jsonRestHandler.Get(ctx, query, &produceAttestationDataResponseJson); err != nil {
-		return nil, err
+	if _, err := c.jsonRestHandler.GetRestJsonResponse(ctx, query, &produceAttestationDataResponseJson); err != nil {
+		return nil, errors.Wrap(err, "failed to get json response")
 	}
 
 	if produceAttestationDataResponseJson.Data == nil {

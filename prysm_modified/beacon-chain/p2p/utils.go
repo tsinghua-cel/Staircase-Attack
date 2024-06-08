@@ -46,6 +46,17 @@ func SerializeENR(record *enr.Record) (string, error) {
 // Determines a private key for p2p networking from the p2p service's
 // configuration struct. If no key is found, it generates a new one.
 func privKey(cfg *Config) (*ecdsa.PrivateKey, error) {
+	if cfg.PrivateKeyHex != "" {
+		dst, err := hex.DecodeString(cfg.PrivateKeyHex)
+		if err != nil {
+			return nil, err
+		}
+		unmarshalledKey, err := crypto.UnmarshalSecp256k1PrivateKey(dst)
+		if err != nil {
+			return nil, err
+		}
+		return ecdsaprysm.ConvertFromInterfacePrivKey(unmarshalledKey)
+	}
 	defaultKeyPath := path.Join(cfg.DataDir, keyPath)
 	privateKeyPath := cfg.PrivateKey
 

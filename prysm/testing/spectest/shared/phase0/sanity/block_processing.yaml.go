@@ -1,6 +1,6 @@
 package sanity
 
-// Config --
-type Config struct {
+// SanityConfig --
+type SanityConfig struct {
 	BlocksCount int `json:"blocks_count"`
 }

@@ -15,16 +15,15 @@ import (
 	p2pTypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/types"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/startup"
 	prysmsync "github.com/prysmaticlabs/prysm/v4/beacon-chain/sync"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/verify"
 	"github.com/prysmaticlabs/prysm/v4/cmd/beacon-chain/flags"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	consensus_types "github.com/prysmaticlabs/prysm/v4/consensus-types"
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	blocks2 "github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	leakybucket "github.com/prysmaticlabs/prysm/v4/container/leaky-bucket"
 	"github.com/prysmaticlabs/prysm/v4/crypto/rand"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/v4/math"
 	p2ppb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
@@ -33,7 +32,6 @@ import (
 )
 
 const (
-
 	// maxPendingRequests limits how many concurrent fetch request one can initiate.
 	maxPendingRequests = 64
 	// peersPercentagePerRequest caps percentage of peers to be used in a request.
@@ -120,7 +118,7 @@ type fetchRequestResponse struct {
 	pid   peer.ID
 	start primitives.Slot
 	count uint64
-	bwb   []blocks2.BlockWithROBlobs
+	bwb   []blocks2.BlockWithVerifiedBlobs
 	err   error
 }
 
@@ -263,7 +261,7 @@ func (f *blocksFetcher) handleRequest(ctx context.Context, start primitives.Slot
 	response := &fetchRequestResponse{
 		start: start,
 		count: count,
-		bwb:   []blocks2.BlockWithROBlobs{},
+		bwb:   []blocks2.BlockWithVerifiedBlobs{},
 		err:   nil,
 	}
 
@@ -304,7 +302,7 @@ func (f *blocksFetcher) fetchBlocksFromPeer(
 	ctx context.Context,
 	start primitives.Slot, count uint64,
 	peers []peer.ID,
-) ([]blocks2.BlockWithROBlobs, peer.ID, error) {
+) ([]blocks2.BlockWithVerifiedBlobs, peer.ID, error) {
 	ctx, span := trace.StartSpan(ctx, "initialsync.fetchBlocksFromPeer")
 	defer span.End()
 
@@ -332,20 +330,20 @@ func (f *blocksFetcher) fetchBlocksFromPeer(
 	return nil, "", errNoPeersAvailable
 }
 
-func sortedBlockWithVerifiedBlobSlice(blocks []interfaces.ReadOnlySignedBeaconBlock) ([]blocks2.BlockWithROBlobs, error) {
-	rb := make([]blocks2.BlockWithROBlobs, len(blocks))
+func sortedBlockWithVerifiedBlobSlice(blocks []interfaces.ReadOnlySignedBeaconBlock) ([]blocks2.BlockWithVerifiedBlobs, error) {
+	rb := make([]blocks2.BlockWithVerifiedBlobs, len(blocks))
 	for i, b := range blocks {
 		ro, err := blocks2.NewROBlock(b)
 		if err != nil {
 			return nil, err
 		}
-		rb[i] = blocks2.BlockWithROBlobs{Block: ro}
+		rb[i] = blocks2.BlockWithVerifiedBlobs{Block: ro}
 	}
-	sort.Sort(blocks2.BlockWithROBlobsSlice(rb))
+	sort.Sort(blocks2.BlockWithVerifiedBlobsSlice(rb))
 	return rb, nil
 }
 
-func blobRequest(bwb []blocks2.BlockWithROBlobs, blobWindowStart primitives.Slot) *p2ppb.BlobSidecarsByRangeRequest {
+func blobRequest(bwb []blocks2.BlockWithVerifiedBlobs, blobWindowStart primitives.Slot) *p2ppb.BlobSidecarsByRangeRequest {
 	if len(bwb) == 0 {
 		return nil
 	}
@@ -360,7 +358,7 @@ func blobRequest(bwb []blocks2.BlockWithROBlobs, blobWindowStart primitives.Slot
 	}
 }
 
-func lowestSlotNeedsBlob(retentionStart primitives.Slot, bwb []blocks2.BlockWithROBlobs) *primitives.Slot {
+func lowestSlotNeedsBlob(retentionStart primitives.Slot, bwb []blocks2.BlockWithVerifiedBlobs) *primitives.Slot {
 	if len(bwb) == 0 {
 		return nil
 	}
@@ -384,12 +382,12 @@ func lowestSlotNeedsBlob(retentionStart primitives.Slot, bwb []blocks2.BlockWith
 	return nil
 }
 
-func sortBlobs(blobs []blocks.ROBlob) []blocks.ROBlob {
+func sortBlobs(blobs []*p2ppb.BlobSidecar) []*p2ppb.BlobSidecar {
 	sort.Slice(blobs, func(i, j int) bool {
-		if blobs[i].Slot() == blobs[j].Slot() {
+		if blobs[i].Slot == blobs[j].Slot {
 			return blobs[i].Index < blobs[j].Index
 		}
-		return blobs[i].Slot() < blobs[j].Slot()
+		return blobs[i].Slot < blobs[j].Slot
 	})
 
 	return blobs
@@ -397,8 +395,11 @@ func sortBlobs(blobs []blocks.ROBlob) []blocks.ROBlob {
 
 var errBlobVerification = errors.New("peer unable to serve aligned BlobSidecarsByRange and BeaconBlockSidecarsByRange responses")
 var errMissingBlobsForBlockCommitments = errors.Wrap(errBlobVerification, "blobs unavailable for processing block with kzg commitments")
+var errMismatchedBlobBlockRoot = errors.Wrap(errBlobVerification, "BlockRoot in BlobSidecar does not match the expected root")
+var errMissingBlobIndex = errors.Wrap(errBlobVerification, "missing expected blob index")
+var errMismatchedBlobCommitments = errors.Wrap(errBlobVerification, "commitments at given slot, root and index do not match")
 
-func verifyAndPopulateBlobs(bwb []blocks2.BlockWithROBlobs, blobs []blocks.ROBlob, blobWindowStart primitives.Slot) ([]blocks2.BlockWithROBlobs, error) {
+func verifyAndPopulateBlobs(bwb []blocks2.BlockWithVerifiedBlobs, blobs []*p2ppb.BlobSidecar, blobWindowStart primitives.Slot) ([]blocks2.BlockWithVerifiedBlobs, error) {
 	// Assumes bwb has already been sorted by sortedBlockWithVerifiedBlobSlice.
 	blobs = sortBlobs(blobs)
 	blobi := 0
@@ -421,7 +422,7 @@ func verifyAndPopulateBlobs(bwb []blocks2.BlockWithROBlobs, blobs []blocks.ROBlo
 			}
 			return nil, err
 		}
-		bb.Blobs = make([]blocks.ROBlob, len(commits))
+		bb.Blobs = make([]*p2ppb.BlobSidecar, len(commits))
 		for ci := range commits {
 			// There are more expected commitments in this block, but we've run out of blobs from the response
 			// (out-of-bound error guard).
@@ -429,8 +430,23 @@ func verifyAndPopulateBlobs(bwb []blocks2.BlockWithROBlobs, blobs []blocks.ROBlo
 				return nil, missingCommitError(bb.Block.Root(), bb.Block.Block().Slot(), commits[ci:])
 			}
 			bl := blobs[blobi]
-			if err := verify.BlobAlignsWithBlock(bl, bb.Block); err != nil {
-				return nil, err
+			if bl.Slot != block.Slot() {
+				return nil, missingCommitError(bb.Block.Root(), bb.Block.Block().Slot(), commits[ci:])
+			}
+			if bytesutil.ToBytes32(bl.BlockRoot) != bb.Block.Root() {
+				return nil, errors.Wrapf(errMismatchedBlobBlockRoot,
+					"block root %#x != BlobSidecar.BlockRoot %#x at slot %d", bb.Block.Root(), bl.BlockRoot, block.Slot())
+			}
+			if ci != int(bl.Index) {
+				return nil, errors.Wrapf(errMissingBlobIndex,
+					"did not receive blob index %d for block root %#x at slot %d", ci, bb.Block.Root(), block.Slot())
+			}
+			ec := bytesutil.ToBytes48(commits[ci])
+			ac := bytesutil.ToBytes48(bl.KzgCommitment)
+			if ec != ac {
+				return nil, errors.Wrapf(errMismatchedBlobCommitments,
+					"commitment %#x != block commitment %#x, at index %d for block root %#x at slot %d ",
+					ac, ec, bl.Index, bb.Block.Root(), block.Slot())
 			}
 			bb.Blobs[ci] = bl
 			blobi += 1
@@ -441,7 +457,7 @@ func verifyAndPopulateBlobs(bwb []blocks2.BlockWithROBlobs, blobs []blocks.ROBlo
 }
 
 func missingCommitError(root [32]byte, slot primitives.Slot, missing [][]byte) error {
-	missStr := make([]string, 0, len(missing))
+	missStr := make([]string, len(missing))
 	for k := range missing {
 		missStr = append(missStr, fmt.Sprintf("%#x", k))
 	}
@@ -450,7 +466,7 @@ func missingCommitError(root [32]byte, slot primitives.Slot, missing [][]byte) e
 }
 
 // fetchBlobsFromPeer fetches blocks from a single randomly selected peer.
-func (f *blocksFetcher) fetchBlobsFromPeer(ctx context.Context, bwb []blocks2.BlockWithROBlobs, pid peer.ID) ([]blocks2.BlockWithROBlobs, error) {
+func (f *blocksFetcher) fetchBlobsFromPeer(ctx context.Context, bwb []blocks2.BlockWithVerifiedBlobs, pid peer.ID) ([]blocks2.BlockWithVerifiedBlobs, error) {
 	ctx, span := trace.StartSpan(ctx, "initialsync.fetchBlobsFromPeer")
 	defer span.End()
 	if slots.ToEpoch(f.clock.CurrentSlot()) < params.BeaconConfig().DenebForkEpoch {
@@ -504,7 +520,7 @@ func (f *blocksFetcher) requestBlocks(
 	return prysmsync.SendBeaconBlocksByRangeRequest(ctx, f.chain, f.p2p, pid, req, nil)
 }
 
-func (f *blocksFetcher) requestBlobs(ctx context.Context, req *p2ppb.BlobSidecarsByRangeRequest, pid peer.ID) ([]blocks.ROBlob, error) {
+func (f *blocksFetcher) requestBlobs(ctx context.Context, req *p2ppb.BlobSidecarsByRangeRequest, pid peer.ID) ([]*p2ppb.BlobSidecar, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -517,7 +533,7 @@ func (f *blocksFetcher) requestBlobs(ctx context.Context, req *p2ppb.BlobSidecar
 		"capacity": f.rateLimiter.Remaining(pid.String()),
 		"score":    f.p2p.Peers().Scorers().BlockProviderScorer().FormatScorePretty(pid),
 	}).Debug("Requesting blobs")
-	// We're intentionally abusing the block rate limit here, treating blob requests as if they were block requests.
+	// We're intentionally abusing the block rate limit here, treating blob requests as if they were blob requests.
 	// Since blob requests take more bandwidth than blocks, we should improve how we account for the different kinds
 	// of requests, more in proportion to the cost of serving them.
 	if f.rateLimiter.Remaining(pid.String()) < int64(req.Count) {

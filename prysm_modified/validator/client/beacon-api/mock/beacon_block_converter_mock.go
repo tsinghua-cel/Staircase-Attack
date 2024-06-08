@@ -8,35 +8,35 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	shared "github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
+	apimiddleware "github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
-// MockBeaconBlockConverter is a mock of BeaconBlockConverter interface.
-type MockBeaconBlockConverter struct {
+// MockbeaconBlockConverter is a mock of beaconBlockConverter interface.
+type MockbeaconBlockConverter struct {
 	ctrl     *gomock.Controller
-	recorder *MockBeaconBlockConverterMockRecorder
+	recorder *MockbeaconBlockConverterMockRecorder
 }
 
-// MockBeaconBlockConverterMockRecorder is the mock recorder for MockBeaconBlockConverter.
-type MockBeaconBlockConverterMockRecorder struct {
-	mock *MockBeaconBlockConverter
+// MockbeaconBlockConverterMockRecorder is the mock recorder for MockbeaconBlockConverter.
+type MockbeaconBlockConverterMockRecorder struct {
+	mock *MockbeaconBlockConverter
 }
 
-// NewMockBeaconBlockConverter creates a new mock instance.
-func NewMockBeaconBlockConverter(ctrl *gomock.Controller) *MockBeaconBlockConverter {
-	mock := &MockBeaconBlockConverter{ctrl: ctrl}
-	mock.recorder = &MockBeaconBlockConverterMockRecorder{mock}
+// NewMockbeaconBlockConverter creates a new mock instance.
+func NewMockbeaconBlockConverter(ctrl *gomock.Controller) *MockbeaconBlockConverter {
+	mock := &MockbeaconBlockConverter{ctrl: ctrl}
+	mock.recorder = &MockbeaconBlockConverterMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockBeaconBlockConverter) EXPECT() *MockBeaconBlockConverterMockRecorder {
+func (m *MockbeaconBlockConverter) EXPECT() *MockbeaconBlockConverterMockRecorder {
 	return m.recorder
 }
 
 // ConvertRESTAltairBlockToProto mocks base method.
-func (m *MockBeaconBlockConverter) ConvertRESTAltairBlockToProto(block *shared.BeaconBlockAltair) (*eth.BeaconBlockAltair, error) {
+func (m *MockbeaconBlockConverter) ConvertRESTAltairBlockToProto(block *apimiddleware.BeaconBlockAltairJson) (*eth.BeaconBlockAltair, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConvertRESTAltairBlockToProto", block)
 	ret0, _ := ret[0].(*eth.BeaconBlockAltair)
@@ -45,13 +45,13 @@ func (m *MockBeaconBlockConverter) ConvertRESTAltairBlockToProto(block *shared.B
 }
 
 // ConvertRESTAltairBlockToProto indicates an expected call of ConvertRESTAltairBlockToProto.
-func (mr *MockBeaconBlockConverterMockRecorder) ConvertRESTAltairBlockToProto(block interface{}) *gomock.Call {
+func (mr *MockbeaconBlockConverterMockRecorder) ConvertRESTAltairBlockToProto(block interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTAltairBlockToProto", reflect.TypeOf((*MockBeaconBlockConverter)(nil).ConvertRESTAltairBlockToProto), block)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTAltairBlockToProto", reflect.TypeOf((*MockbeaconBlockConverter)(nil).ConvertRESTAltairBlockToProto), block)
 }
 
 // ConvertRESTBellatrixBlockToProto mocks base method.
-func (m *MockBeaconBlockConverter) ConvertRESTBellatrixBlockToProto(block *shared.BeaconBlockBellatrix) (*eth.BeaconBlockBellatrix, error) {
+func (m *MockbeaconBlockConverter) ConvertRESTBellatrixBlockToProto(block *apimiddleware.BeaconBlockBellatrixJson) (*eth.BeaconBlockBellatrix, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConvertRESTBellatrixBlockToProto", block)
 	ret0, _ := ret[0].(*eth.BeaconBlockBellatrix)
@@ -60,13 +60,13 @@ func (m *MockBeaconBlockConverter) ConvertRESTBellatrixBlockToProto(block *share
 }
 
 // ConvertRESTBellatrixBlockToProto indicates an expected call of ConvertRESTBellatrixBlockToProto.
-func (mr *MockBeaconBlockConverterMockRecorder) ConvertRESTBellatrixBlockToProto(block interface{}) *gomock.Call {
+func (mr *MockbeaconBlockConverterMockRecorder) ConvertRESTBellatrixBlockToProto(block interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTBellatrixBlockToProto", reflect.TypeOf((*MockBeaconBlockConverter)(nil).ConvertRESTBellatrixBlockToProto), block)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTBellatrixBlockToProto", reflect.TypeOf((*MockbeaconBlockConverter)(nil).ConvertRESTBellatrixBlockToProto), block)
 }
 
 // ConvertRESTCapellaBlockToProto mocks base method.
-func (m *MockBeaconBlockConverter) ConvertRESTCapellaBlockToProto(block *shared.BeaconBlockCapella) (*eth.BeaconBlockCapella, error) {
+func (m *MockbeaconBlockConverter) ConvertRESTCapellaBlockToProto(block *apimiddleware.BeaconBlockCapellaJson) (*eth.BeaconBlockCapella, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConvertRESTCapellaBlockToProto", block)
 	ret0, _ := ret[0].(*eth.BeaconBlockCapella)
@@ -75,13 +75,13 @@ func (m *MockBeaconBlockConverter) ConvertRESTCapellaBlockToProto(block *shared.
 }
 
 // ConvertRESTCapellaBlockToProto indicates an expected call of ConvertRESTCapellaBlockToProto.
-func (mr *MockBeaconBlockConverterMockRecorder) ConvertRESTCapellaBlockToProto(block interface{}) *gomock.Call {
+func (mr *MockbeaconBlockConverterMockRecorder) ConvertRESTCapellaBlockToProto(block interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTCapellaBlockToProto", reflect.TypeOf((*MockBeaconBlockConverter)(nil).ConvertRESTCapellaBlockToProto), block)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTCapellaBlockToProto", reflect.TypeOf((*MockbeaconBlockConverter)(nil).ConvertRESTCapellaBlockToProto), block)
 }
 
 // ConvertRESTPhase0BlockToProto mocks base method.
-func (m *MockBeaconBlockConverter) ConvertRESTPhase0BlockToProto(block *shared.BeaconBlock) (*eth.BeaconBlock, error) {
+func (m *MockbeaconBlockConverter) ConvertRESTPhase0BlockToProto(block *apimiddleware.BeaconBlockJson) (*eth.BeaconBlock, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConvertRESTPhase0BlockToProto", block)
 	ret0, _ := ret[0].(*eth.BeaconBlock)
@@ -90,7 +90,7 @@ func (m *MockBeaconBlockConverter) ConvertRESTPhase0BlockToProto(block *shared.B
 }
 
 // ConvertRESTPhase0BlockToProto indicates an expected call of ConvertRESTPhase0BlockToProto.
-func (mr *MockBeaconBlockConverterMockRecorder) ConvertRESTPhase0BlockToProto(block interface{}) *gomock.Call {
+func (mr *MockbeaconBlockConverterMockRecorder) ConvertRESTPhase0BlockToProto(block interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTPhase0BlockToProto", reflect.TypeOf((*MockBeaconBlockConverter)(nil).ConvertRESTPhase0BlockToProto), block)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConvertRESTPhase0BlockToProto", reflect.TypeOf((*MockbeaconBlockConverter)(nil).ConvertRESTPhase0BlockToProto), block)
 }

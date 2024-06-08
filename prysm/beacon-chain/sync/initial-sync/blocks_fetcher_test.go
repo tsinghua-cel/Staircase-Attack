@@ -17,7 +17,6 @@ import (
 	p2pt "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/testing"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/startup"
 	beaconsync "github.com/prysmaticlabs/prysm/v4/beacon-chain/sync"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/verify"
 	"github.com/prysmaticlabs/prysm/v4/cmd/beacon-chain/flags"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
@@ -306,9 +305,9 @@ func TestBlocksFetcher_RoundRobin(t *testing.T) {
 				fetcher.stop()
 			}()
 
-			processFetchedBlocks := func() ([]blocks.BlockWithROBlobs, error) {
+			processFetchedBlocks := func() ([]blocks.BlockWithVerifiedBlobs, error) {
 				defer cancel()
-				var unionRespBlocks []blocks.BlockWithROBlobs
+				var unionRespBlocks []blocks.BlockWithVerifiedBlobs
 
 				for {
 					select {
@@ -347,7 +346,7 @@ func TestBlocksFetcher_RoundRobin(t *testing.T) {
 			bwb, err := processFetchedBlocks()
 			assert.NoError(t, err)
 
-			sort.Sort(blocks.BlockWithROBlobsSlice(bwb))
+			sort.Sort(blocks.BlockWithVerifiedBlobsSlice(bwb))
 			ss := make([]primitives.Slot, len(bwb))
 			for i, b := range bwb {
 				ss[i] = b.Block.Block().Slot()
@@ -454,7 +453,7 @@ func TestBlocksFetcher_handleRequest(t *testing.T) {
 			}
 		}()
 
-		var bwb []blocks.BlockWithROBlobs
+		var bwb []blocks.BlockWithVerifiedBlobs
 		select {
 		case <-ctx.Done():
 			t.Error(ctx.Err())
@@ -606,7 +605,9 @@ func TestBlocksFetcher_WaitForBandwidth(t *testing.T) {
 	p1.Connect(p2)
 	require.Equal(t, 1, len(p1.BHost.Network().Peers()), "Expected peers to be connected")
 	req := &ethpb.BeaconBlocksByRangeRequest{
-		Count: 64,
+		StartSlot: 100,
+		Step:      1,
+		Count:     64,
 	}
 
 	topic := p2pm.RPCBlocksByRangeTopicV1
@@ -960,7 +961,7 @@ func TestTimeToWait(t *testing.T) {
 
 func TestSortBlobs(t *testing.T) {
 	_, blobs := util.ExtendBlocksPlusBlobs(t, []blocks.ROBlock{}, 10)
-	shuffled := make([]blocks.ROBlob, len(blobs))
+	shuffled := make([]*ethpb.BlobSidecar, len(blobs))
 	for i := range blobs {
 		shuffled[i] = blobs[i]
 	}
@@ -972,10 +973,10 @@ func TestSortBlobs(t *testing.T) {
 	for i := range blobs {
 		expect := blobs[i]
 		actual := sorted[i]
-		require.Equal(t, expect.Slot(), actual.Slot())
+		require.Equal(t, expect.Slot, actual.Slot)
 		require.Equal(t, expect.Index, actual.Index)
 		require.Equal(t, bytesutil.ToBytes48(expect.KzgCommitment), bytesutil.ToBytes48(actual.KzgCommitment))
-		require.Equal(t, expect.BlockRoot(), actual.BlockRoot())
+		require.Equal(t, bytesutil.ToBytes32(expect.BlockRoot), bytesutil.ToBytes32(actual.BlockRoot))
 	}
 }
 
@@ -1013,7 +1014,7 @@ func TestLowestSlotNeedsBlob(t *testing.T) {
 func TestBlobRequest(t *testing.T) {
 	var nilReq *ethpb.BlobSidecarsByRangeRequest
 	// no blocks
-	req := blobRequest([]blocks.BlockWithROBlobs{}, 0)
+	req := blobRequest([]blocks.BlockWithVerifiedBlobs{}, 0)
 	require.Equal(t, nilReq, req)
 	blks, _ := util.ExtendBlocksPlusBlobs(t, []blocks.ROBlock{}, 10)
 	sbbs := make([]interfaces.ReadOnlySignedBeaconBlock, len(blks))
@@ -1045,7 +1046,7 @@ func TestBlobRequest(t *testing.T) {
 	require.Equal(t, len(allAfter), int(req.Count))
 }
 
-func testSequenceBlockWithBlob(t *testing.T, nblocks int) ([]blocks.BlockWithROBlobs, []blocks.ROBlob) {
+func testSequenceBlockWithBlob(t *testing.T, nblocks int) ([]blocks.BlockWithVerifiedBlobs, []*ethpb.BlobSidecar) {
 	blks, blobs := util.ExtendBlocksPlusBlobs(t, []blocks.ROBlock{}, nblocks)
 	sbbs := make([]interfaces.ReadOnlySignedBeaconBlock, len(blks))
 	for i := range blks {
@@ -1071,47 +1072,30 @@ func TestVerifyAndPopulateBlobs(t *testing.T) {
 
 	bwb, blobs = testSequenceBlockWithBlob(t, 10)
 	// Misalign the slots of the blobs for the first block to simulate them being missing from the response.
-	offByOne := blobs[0].Slot()
+	offByOne := blobs[0].Slot
 	for i := range blobs {
-		if blobs[i].Slot() == offByOne {
-			blobs[i].SignedBlockHeader.Header.Slot = offByOne + 1
+		if blobs[i].Slot == offByOne {
+			blobs[i].Slot = offByOne + 1
 		}
 	}
 	_, err = verifyAndPopulateBlobs(bwb, blobs, firstBlockSlot)
-	require.ErrorIs(t, err, verify.ErrBlobBlockMisaligned)
+	require.ErrorIs(t, err, errMissingBlobsForBlockCommitments)
 
 	bwb, blobs = testSequenceBlockWithBlob(t, 10)
-	blobs[lastBlobIdx], err = blocks.NewROBlobWithRoot(blobs[lastBlobIdx].BlobSidecar, blobs[0].BlockRoot())
-	require.NoError(t, err)
+	blobs[lastBlobIdx].BlockRoot = blobs[0].BlockRoot
 	_, err = verifyAndPopulateBlobs(bwb, blobs, firstBlockSlot)
-	require.ErrorIs(t, err, verify.ErrBlobBlockMisaligned)
+	require.ErrorIs(t, err, errMismatchedBlobBlockRoot)
 
 	bwb, blobs = testSequenceBlockWithBlob(t, 10)
 	blobs[lastBlobIdx].Index = 100
 	_, err = verifyAndPopulateBlobs(bwb, blobs, firstBlockSlot)
-	require.ErrorIs(t, err, verify.ErrIncorrectBlobIndex)
-
-	bwb, blobs = testSequenceBlockWithBlob(t, 10)
-	blobs[lastBlobIdx].SignedBlockHeader.Header.ProposerIndex = 100
-	blobs[lastBlobIdx], err = blocks.NewROBlob(blobs[lastBlobIdx].BlobSidecar)
-	require.NoError(t, err)
-	_, err = verifyAndPopulateBlobs(bwb, blobs, firstBlockSlot)
-	require.ErrorIs(t, err, verify.ErrBlobBlockMisaligned)
-
-	bwb, blobs = testSequenceBlockWithBlob(t, 10)
-	blobs[lastBlobIdx].SignedBlockHeader.Header.ParentRoot = blobs[0].SignedBlockHeader.Header.ParentRoot
-	blobs[lastBlobIdx], err = blocks.NewROBlob(blobs[lastBlobIdx].BlobSidecar)
-	require.NoError(t, err)
-	_, err = verifyAndPopulateBlobs(bwb, blobs, firstBlockSlot)
-	require.ErrorIs(t, err, verify.ErrBlobBlockMisaligned)
+	require.ErrorIs(t, err, errMissingBlobIndex)
 
 	var emptyKzg [48]byte
 	bwb, blobs = testSequenceBlockWithBlob(t, 10)
 	blobs[lastBlobIdx].KzgCommitment = emptyKzg[:]
-	blobs[lastBlobIdx], err = blocks.NewROBlob(blobs[lastBlobIdx].BlobSidecar)
-	require.NoError(t, err)
 	_, err = verifyAndPopulateBlobs(bwb, blobs, firstBlockSlot)
-	require.ErrorIs(t, err, verify.ErrMismatchedBlobCommitments)
+	require.ErrorIs(t, err, errMismatchedBlobCommitments)
 
 	// happy path
 	bwb, blobs = testSequenceBlockWithBlob(t, 10)

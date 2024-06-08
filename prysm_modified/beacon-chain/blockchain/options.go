@@ -5,7 +5,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/filesystem"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/execution"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/operations/attestations"
@@ -69,18 +68,10 @@ func WithDepositCache(c cache.DepositCache) Option {
 	}
 }
 
-// WithPayloadIDCache for payload ID cache.
-func WithPayloadIDCache(c *cache.PayloadIDCache) Option {
+// WithProposerIdsCache for proposer id cache.
+func WithProposerIdsCache(c *cache.ProposerPayloadIDsCache) Option {
 	return func(s *Service) error {
-		s.cfg.PayloadIDCache = c
-		return nil
-	}
-}
-
-// WithTrackedValidatorsCache for tracked validators cache.
-func WithTrackedValidatorsCache(c *cache.TrackedValidatorsCache) Option {
-	return func(s *Service) error {
-		s.cfg.TrackedValidatorsCache = c
+		s.cfg.ProposerSlotIndexCache = c
 		return nil
 	}
 }
@@ -173,8 +164,6 @@ func WithFinalizedStateAtStartUp(st state.BeaconState) Option {
 	}
 }
 
-// WithClockSynchronizer sets the ClockSetter/ClockWaiter values to be used by services that need to block until
-// the genesis timestamp is known (ClockWaiter) or which determine the genesis timestamp (ClockSetter).
 func WithClockSynchronizer(gs *startup.ClockSynchronizer) Option {
 	return func(s *Service) error {
 		s.clockSetter = gs
@@ -183,18 +172,9 @@ func WithClockSynchronizer(gs *startup.ClockSynchronizer) Option {
 	}
 }
 
-// WithSyncComplete sets a channel that is used to notify blockchain service that the node has synced to head.
 func WithSyncComplete(c chan struct{}) Option {
 	return func(s *Service) error {
 		s.syncComplete = c
-		return nil
-	}
-}
-
-// WithBlobStorage sets the blob storage backend for the blockchain service.
-func WithBlobStorage(b *filesystem.BlobStorage) Option {
-	return func(s *Service) error {
-		s.blobStorage = b
 		return nil
 	}
 }

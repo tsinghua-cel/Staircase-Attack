@@ -7,7 +7,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	kzgPrysm "github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain/kzg"
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	"github.com/prysmaticlabs/prysm/v4/testing/spectest/utils"
@@ -37,40 +36,37 @@ func TestVerifyBlobKZGProofBatch(t *testing.T) {
 			require.NoError(t, err)
 			test := &KZGTestData{}
 			require.NoError(t, yaml.Unmarshal(file, test))
-			var sidecars []blocks.ROBlob
+			var sidecars []*ethpb.BlobSidecar
 			blobs := test.Input.Blobs
+			commitments := test.Input.Commitments
 			proofs := test.Input.Proofs
-			kzgs := test.Input.Commitments
 			if len(proofs) != len(blobs) {
 				require.Equal(t, false, test.Output)
 				return
 			}
-			if len(kzgs) != len(blobs) {
-				require.Equal(t, false, test.Output)
-				return
-			}
-
+			var kzgs [][]byte
+			// Need separate loops to test length checks in
+			// `IsDataAvailable`
 			for i, blob := range blobs {
 				blobBytes, err := hex.DecodeString(blob[2:])
 				require.NoError(t, err)
 				proofBytes, err := hex.DecodeString(proofs[i][2:])
 				require.NoError(t, err)
-				kzgBytes, err := hex.DecodeString(kzgs[i][2:])
-				require.NoError(t, err)
 				sidecar := &ethpb.BlobSidecar{
-					Blob:          blobBytes,
-					KzgProof:      proofBytes,
-					KzgCommitment: kzgBytes,
+					Blob:     blobBytes,
+					KzgProof: proofBytes,
 				}
-				sidecar.SignedBlockHeader = util.HydrateSignedBeaconHeader(&ethpb.SignedBeaconBlockHeader{})
-				sc, err := blocks.NewROBlob(sidecar)
+				sidecars = append(sidecars, sidecar)
+			}
+			for _, commitment := range commitments {
+				commitmentBytes, err := hex.DecodeString(commitment[2:])
 				require.NoError(t, err)
-				sidecars = append(sidecars, sc)
+				kzgs = append(kzgs, commitmentBytes)
 			}
 			if test.Output {
-				require.NoError(t, kzgPrysm.Verify(sidecars...))
+				require.NoError(t, kzgPrysm.IsDataAvailable(kzgs, sidecars))
 			} else {
-				require.NotNil(t, kzgPrysm.Verify(sidecars...))
+				require.NotNil(t, kzgPrysm.IsDataAvailable(kzgs, sidecars))
 			}
 		})
 	}

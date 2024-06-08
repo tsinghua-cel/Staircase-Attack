@@ -15,11 +15,9 @@ import (
 )
 
 func TestProposeBeaconBlock_Deneb(t *testing.T) {
-	t.Skip("TODO: Fix this in the beacon-API PR")
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
 	var blockContents shared.SignedBeaconBlockContentsDeneb
 	err := json.Unmarshal([]byte(rpctesting.DenebBlockContents), &blockContents)
@@ -31,7 +29,7 @@ func TestProposeBeaconBlock_Deneb(t *testing.T) {
 	require.NoError(t, err)
 	// Make sure that what we send in the POST body is the marshalled version of the protobuf block
 	headers := map[string]string{"Eth-Consensus-Version": "deneb"}
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler.EXPECT().PostRestJson(
 		context.Background(),
 		"/eth/v1/beacon/blocks",
 		headers,

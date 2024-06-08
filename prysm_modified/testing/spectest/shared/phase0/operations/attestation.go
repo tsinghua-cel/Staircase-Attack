@@ -35,7 +35,7 @@ func RunAttestationTest(t *testing.T, config string) {
 
 			body := &ethpb.BeaconBlockBody{Attestations: []*ethpb.Attestation{att}}
 			processAtt := func(ctx context.Context, st state.BeaconState, blk interfaces.ReadOnlySignedBeaconBlock) (state.BeaconState, error) {
-				st, err = b.ProcessAttestationsNoVerifySignature(ctx, st, blk.Block())
+				st, err = b.ProcessAttestationsNoVerifySignature(ctx, st, blk)
 				if err != nil {
 					return nil, err
 				}

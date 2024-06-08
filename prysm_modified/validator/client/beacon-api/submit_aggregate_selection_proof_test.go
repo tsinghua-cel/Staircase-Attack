@@ -10,8 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/mock/gomock"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/beacon"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/node"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/validator"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -125,7 +126,7 @@ func TestSubmitAggregateSelectionProof(t *testing.T) {
 			attestationDataCalled:      1,
 			aggregateAttestationCalled: 1,
 			aggregateAttestationErr:    errors.New("bad request"),
-			expectedErrorMsg:           "bad request",
+			expectedErrorMsg:           "failed to get aggregate attestation",
 		},
 		{
 			name: "validator is not an aggregator",
@@ -154,40 +155,32 @@ func TestSubmitAggregateSelectionProof(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
 			// Call node syncing endpoint to check if head is optimistic.
-			jsonRestHandler.EXPECT().Get(
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
 				syncingEndpoint,
-				&node.SyncStatusResponse{},
+				&apimiddleware.SyncingResponseJson{},
 			).SetArg(
 				2,
-				node.SyncStatusResponse{
-					Data: &node.SyncStatusResponseData{
+				apimiddleware.SyncingResponseJson{
+					Data: &shared.SyncDetails{
 						IsOptimistic: test.isOptimistic,
 					},
 				},
 			).Return(
+				nil,
 				test.syncingErr,
 			).Times(1)
 
-			valsReq := &beacon.GetValidatorsRequest{
-				Ids:      []string{stringPubKey},
-				Statuses: []string{},
-			}
-			valReqBytes, err := json.Marshal(valsReq)
-			require.NoError(t, err)
-
 			// Call validators endpoint to get validator index.
-			jsonRestHandler.EXPECT().Post(
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
-				validatorsEndpoint,
-				nil,
-				bytes.NewBuffer(valReqBytes),
+				fmt.Sprintf("%s?id=%s", validatorsEndpoint, pubkeyStr),
 				&beacon.GetValidatorsResponse{},
 			).SetArg(
-				4,
+				2,
 				beacon.GetValidatorsResponse{
 					Data: []*beacon.ValidatorContainer{
 						{
@@ -200,13 +193,14 @@ func TestSubmitAggregateSelectionProof(t *testing.T) {
 					},
 				},
 			).Return(
+				nil,
 				test.validatorsErr,
 			).Times(test.validatorsCalled)
 
 			// Call attester duties endpoint to get attester duties.
 			validatorIndicesBytes, err := json.Marshal([]string{validatorIndex})
 			require.NoError(t, err)
-			jsonRestHandler.EXPECT().Post(
+			jsonRestHandler.EXPECT().PostRestJson(
 				ctx,
 				fmt.Sprintf("%s/%d", attesterDutiesEndpoint, slots.ToEpoch(slot)),
 				nil,
@@ -218,11 +212,12 @@ func TestSubmitAggregateSelectionProof(t *testing.T) {
 					Data: test.duties,
 				},
 			).Return(
+				nil,
 				test.dutiesErr,
 			).Times(test.attesterDutiesCalled)
 
 			// Call attestation data to get attestation data root to query aggregate attestation.
-			jsonRestHandler.EXPECT().Get(
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
 				fmt.Sprintf("%s?committee_index=%d&slot=%d", attestationDataEndpoint, committeeIndex, slot),
 				&validator.GetAttestationDataResponse{},
@@ -230,20 +225,22 @@ func TestSubmitAggregateSelectionProof(t *testing.T) {
 				2,
 				attestationDataResponse,
 			).Return(
+				nil,
 				test.attestationDataErr,
 			).Times(test.attestationDataCalled)
 
 			// Call attestation data to get attestation data root to query aggregate attestation.
-			jsonRestHandler.EXPECT().Get(
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
 				fmt.Sprintf("%s?attestation_data_root=%s&slot=%d", aggregateAttestationEndpoint, hexutil.Encode(attestationDataRootBytes[:]), slot),
-				&validator.AggregateAttestationResponse{},
+				&apimiddleware.AggregateAttestationResponseJson{},
 			).SetArg(
 				2,
-				validator.AggregateAttestationResponse{
+				apimiddleware.AggregateAttestationResponseJson{
 					Data: jsonifyAttestation(aggregateAttestation),
 				},
 			).Return(
+				nil,
 				test.aggregateAttestationErr,
 			).Times(test.aggregateAttestationCalled)
 

@@ -8,6 +8,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/async/event"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	ethpbservice "github.com/prysmaticlabs/prysm/v4/proto/eth/service"
 	validatorpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/validator-client"
 )
 
@@ -41,12 +42,12 @@ type Signer interface {
 type Importer interface {
 	ImportKeystores(
 		ctx context.Context, keystores []*Keystore, passwords []string,
-	) ([]*KeyStatus, error)
+	) ([]*ethpbservice.ImportedKeystoreStatus, error)
 }
 
 // Deleter can delete keystores from the keymanager.
 type Deleter interface {
-	DeleteKeystores(ctx context.Context, publicKeys [][]byte) ([]*KeyStatus, error)
+	DeleteKeystores(ctx context.Context, publicKeys [][]byte) ([]*ethpbservice.DeletedKeystoreStatus, error)
 }
 
 // KeyChangeSubscriber allows subscribing to changes made to the underlying keys.
@@ -61,31 +62,12 @@ type KeyStoreExtractor interface {
 
 // PublicKeyAdder allows adding public keys to the keymanager.
 type PublicKeyAdder interface {
-	AddPublicKeys(publicKeys []string) []*KeyStatus
+	AddPublicKeys(ctx context.Context, publicKeys [][fieldparams.BLSPubkeyLength]byte) ([]*ethpbservice.ImportedRemoteKeysStatus, error)
 }
-
-// KeyStatus is a json representation of the status fields for the keymanager apis
-type KeyStatus struct {
-	Status  KeyStatusType `json:"status"`
-	Message string        `json:"message"`
-}
-
-// KeyStatusType is a category of key status
-type KeyStatusType string
-
-const (
-	StatusImported  KeyStatusType = "IMPORTED"
-	StatusError     KeyStatusType = "ERROR"
-	StatusDuplicate KeyStatusType = "DUPLICATE"
-	StatusUnknown   KeyStatusType = "UNKNOWN"
-	StatusNotFound  KeyStatusType = "NOT_FOUND"
-	StatusDeleted   KeyStatusType = "DELETED"
-	StatusNotActive KeyStatusType = "NOT_ACTIVE"
-)
 
 // PublicKeyDeleter allows deleting public keys set in keymanager.
 type PublicKeyDeleter interface {
-	DeletePublicKeys(publicKeys []string) []*KeyStatus
+	DeletePublicKeys(ctx context.Context, publicKeys [][fieldparams.BLSPubkeyLength]byte) ([]*ethpbservice.DeletedRemoteKeysStatus, error)
 }
 
 type ListKeymanagerAccountConfig struct {

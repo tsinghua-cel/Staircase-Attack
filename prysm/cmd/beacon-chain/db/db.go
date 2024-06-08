@@ -14,7 +14,7 @@ var log = logrus.WithField("prefix", "db")
 var Commands = &cli.Command{
 	Name:     "db",
 	Category: "db",
-	Usage:    "Defines commands for interacting with the Ethereum Beacon Node database",
+	Usage:    "defines commands for interacting with the Ethereum Beacon Node database",
 	Subcommands: []*cli.Command{
 		{
 			Name:        "restore",

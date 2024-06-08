@@ -7,6 +7,7 @@ import (
 
 	libp2pcore "github.com/libp2p/go-libp2p/core"
 	"github.com/pkg/errors"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p"
 	p2ptypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/types"
 	"github.com/prysmaticlabs/prysm/v4/cmd/beacon-chain/flags"
@@ -24,26 +25,19 @@ func (s *Service) streamBlobBatch(ctx context.Context, batch blockBatch, wQuota 
 	if wQuota == 0 {
 		return 0, nil
 	}
-	_, span := trace.StartSpan(ctx, "sync.streamBlobBatch")
+	ctx, span := trace.StartSpan(ctx, "sync.streamBlobBatch")
 	defer span.End()
 	for _, b := range batch.canonical() {
 		root := b.Root()
-		idxs, err := s.cfg.blobStorage.Indices(b.Root())
+		scs, err := s.cfg.beaconDB.BlobSidecarsByRoot(ctx, b.Root())
+		if errors.Is(err, db.ErrNotFound) {
+			continue
+		}
 		if err != nil {
 			s.writeErrorResponseToStream(responseCodeServerError, p2ptypes.ErrGeneric.Error(), stream)
 			return wQuota, errors.Wrapf(err, "could not retrieve sidecars for block root %#x", root)
 		}
-		for i, l := uint64(0), uint64(len(idxs)); i < l; i++ {
-			// index not available, skip
-			if !idxs[i] {
-				continue
-			}
-			// We won't check for file not found since the .Indices method should normally prevent that from happening.
-			sc, err := s.cfg.blobStorage.Get(b.Root(), i)
-			if err != nil {
-				s.writeErrorResponseToStream(responseCodeServerError, p2ptypes.ErrGeneric.Error(), stream)
-				return wQuota, errors.Wrapf(err, "could not retrieve sidecar: index %d, block root %#x", i, root)
-			}
+		for _, sc := range scs {
 			SetStreamWriteDeadline(stream, defaultWriteDuration)
 			if chunkErr := WriteBlobSidecarChunk(stream, s.cfg.chain, s.cfg.p2p.Encoding(), sc); chunkErr != nil {
 				log.WithError(chunkErr).Debug("Could not send a chunked response")
@@ -91,15 +85,9 @@ func (s *Service) blobSidecarsByRangeRPCHandler(ctx context.Context, msg interfa
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	batcher, err := newBlockRangeBatcher(rp, s.cfg.beaconDB, s.rateLimiter, s.cfg.chain.IsCanonical, ticker)
-	if err != nil {
-		log.WithError(err).Info("error in BlobSidecarsByRange batch")
-		s.writeErrorResponseToStream(responseCodeServerError, p2ptypes.ErrGeneric.Error(), stream)
-		tracing.AnnotateError(span, err)
-		return err
-	}
 
 	var batch blockBatch
-	wQuota := params.BeaconConfig().MaxRequestBlobSidecars
+	wQuota := params.BeaconNetworkConfig().MaxRequestBlobSidecars
 	for batch, ok = batcher.next(ctx, stream); ok; batch, ok = batcher.next(ctx, stream) {
 		batchStart := time.Now()
 		wQuota, err = s.streamBlobBatch(ctx, batch, wQuota, stream)
@@ -113,7 +101,7 @@ func (s *Service) blobSidecarsByRangeRPCHandler(ctx context.Context, msg interfa
 		}
 	}
 	if err := batch.error(); err != nil {
-		log.WithError(err).Debug("error in BlobSidecarsByRange batch")
+		log.WithError(err).Debug("error in BlocksByRange batch")
 		s.writeErrorResponseToStream(responseCodeServerError, p2ptypes.ErrGeneric.Error(), stream)
 		tracing.AnnotateError(span, err)
 		return err
@@ -131,7 +119,7 @@ func BlobsByRangeMinStartSlot(current primitives.Slot) (primitives.Slot, error) 
 	if params.BeaconConfig().DenebForkEpoch == math.MaxUint64 {
 		return primitives.Slot(math.MaxUint64), nil
 	}
-	minReqEpochs := params.BeaconConfig().MinEpochsForBlobsSidecarsRequest
+	minReqEpochs := params.BeaconNetworkConfig().MinEpochsForBlobsSidecarsRequest
 	currEpoch := slots.ToEpoch(current)
 	minStart := params.BeaconConfig().DenebForkEpoch
 	if currEpoch > minReqEpochs && currEpoch-minReqEpochs > minStart {
@@ -159,12 +147,12 @@ func validateBlobsByRange(r *pb.BlobSidecarsByRangeRequest, current primitives.S
 	}
 
 	var err error
-	rp.end, err = rp.start.SafeAdd(rp.size - 1)
+	rp.end, err = rp.start.SafeAdd((rp.size - 1))
 	if err != nil {
 		return rangeParams{}, errors.Wrap(p2ptypes.ErrInvalidRequest, "overflow start + count -1")
 	}
 
-	maxRequest := params.MaxRequestBlock(slots.ToEpoch(current))
+	maxRequest := params.BeaconNetworkConfig().MaxRequestBlocksDeneb
 	// Allow some wiggle room, up to double the MaxRequestBlocks past the current slot,
 	// to give nodes syncing close to the head of the chain some margin for error.
 	maxStart, err := current.SafeAdd(maxRequest * 2)

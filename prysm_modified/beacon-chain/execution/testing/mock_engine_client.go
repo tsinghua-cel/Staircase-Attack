@@ -83,6 +83,11 @@ func (e *EngineClient) GetPayload(_ context.Context, _ [8]byte, s primitives.Slo
 	return p, nil, e.BuilderOverride, e.ErrGetPayload
 }
 
+// ExchangeTransitionConfiguration --
+func (e *EngineClient) ExchangeTransitionConfiguration(_ context.Context, _ *pb.TransitionConfiguration) error {
+	return e.Err
+}
+
 // LatestExecutionBlock --
 func (e *EngineClient) LatestExecutionBlock(_ context.Context) (*pb.ExecutionBlock, error) {
 	return e.ExecutionBlock, e.ErrLatestExecBlock

@@ -14,7 +14,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache/depositcache"
 	coreTime "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/filesystem"
 	testDB "github.com/prysmaticlabs/prysm/v4/beacon-chain/db/testing"
 	doublylinkedtree "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/doubly-linked-tree"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/operations/attestations"
@@ -68,10 +67,8 @@ func startChainService(t testing.TB,
 		blockchain.WithStateNotifier(&mock.MockStateNotifier{}),
 		blockchain.WithAttestationPool(attestations.NewPool()),
 		blockchain.WithDepositCache(depositCache),
-		blockchain.WithTrackedValidatorsCache(cache.NewTrackedValidatorsCache()),
-		blockchain.WithPayloadIDCache(cache.NewPayloadIDCache()),
+		blockchain.WithProposerIdsCache(cache.NewProposerPayloadIDsCache()),
 		blockchain.WithClockSynchronizer(startup.NewClockSynchronizer()),
-		blockchain.WithBlobStorage(filesystem.NewEphemeralBlobStorage(t)),
 	)
 	service, err := blockchain.NewService(context.Background(), opts...)
 	require.NoError(t, err)
@@ -107,6 +104,10 @@ func (m *engineMock) ForkchoiceUpdatedV2(context.Context, *pb.ForkchoiceState, p
 
 func (m *engineMock) LatestExecutionBlock(context.Context) (*pb.ExecutionBlock, error) {
 	return nil, nil
+}
+
+func (m *engineMock) ExchangeTransitionConfiguration(context.Context, *pb.TransitionConfiguration) error {
+	return nil
 }
 
 func (m *engineMock) ExecutionBlockByHash(_ context.Context, hash common.Hash, _ bool) (*pb.ExecutionBlock, error) {

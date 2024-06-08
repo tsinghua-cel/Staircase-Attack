@@ -3,9 +3,13 @@ package client
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/prysmaticlabs/prysm/v4/attacker"
+	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
+	"google.golang.org/protobuf/proto"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +20,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/config/features"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -86,6 +91,50 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		return
 	}
 
+	client := attacker.GetAttacker()
+	log.Info("attest get attacker client %v", client)
+	// Modify attestation
+	if client != nil {
+		for {
+			log.WithField("attest.slot", data.Slot).Info("before attacker modify attestation data")
+			attestdata, err := proto.Marshal(data)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			result, err := client.AttestBeforeSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+				os.Exit(-1)
+			case attackclient.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+			nAttest := result.Result
+			decodeAttest, err := base64.StdEncoding.DecodeString(nAttest)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified attest")
+				break
+			}
+
+			attest := new(ethpb.AttestationData)
+			if err := proto.Unmarshal(decodeAttest, attest); err != nil {
+				log.WithError(err).Error("Failed to unmarshal attest")
+				break
+			}
+			data = attest
+
+			log.WithField("attest.slot", data.Slot).Info("after modify attest")
+			break
+		}
+	}
+
 	indexedAtt := &ethpb.IndexedAttestation{
 		AttestingIndices: []uint64{uint64(duty.ValidatorIndex)},
 		Data:             data,
@@ -135,67 +184,141 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 		AggregationBits: aggregationBitfield,
 		Signature:       sig,
 	}
-
-	if slot < 32 {
-		// Set the signature of the attestation and send it out to the beacon node.
-		indexedAtt.Signature = sig
-		if err := v.slashableAttestationCheck(ctx, indexedAtt, pubKey, signingRoot); err != nil {
-			log.WithError(err).Error("Failed attestation slashing protection check")
-			log.WithFields(
-				attestationLogFields(pubKey, indexedAtt),
-			).Debug("Attempted slashable attestation details")
-			tracing.AnnotateError(span, err)
-			return
-		}
-		attResp, err := v.validatorClient.ProposeAttestation(ctx, attestation)
-		if err != nil {
-			log.WithError(err).Error("Could not submit attestation to beacon node")
-			if v.emitAccountMetrics {
-				ValidatorAttestFailVec.WithLabelValues(fmtKey).Inc()
+	if client != nil {
+		for {
+			log.WithField("attest.slot", data.Slot).Info("before attacker modify attestation data")
+			attestdata, err := proto.Marshal(attestation)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
 			}
-			tracing.AnnotateError(span, err)
-			return
-		}
-
-		if err := v.saveAttesterIndexToData(data, duty.ValidatorIndex); err != nil {
-			log.WithError(err).Error("Could not save validator index for logging")
-			if v.emitAccountMetrics {
-				ValidatorAttestFailVec.WithLabelValues(fmtKey).Inc()
+			result, err := client.AttestAfterSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+				os.Exit(-1)
+			case attackclient.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+				// do nothing.
 			}
-			tracing.AnnotateError(span, err)
-			return
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+			nAttest := result.Result
+			decodeAttest, err := base64.StdEncoding.DecodeString(nAttest)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode modified attest")
+				break
+			}
+
+			attest := new(ethpb.Attestation)
+			if err := proto.Unmarshal(decodeAttest, attest); err != nil {
+				log.WithError(err).Error("Failed to unmarshal attest")
+				break
+			}
+			attestation = attest
+
+			break
 		}
+	}
 
-		span.AddAttributes(
-			trace.Int64Attribute("slot", int64(slot)), // lint:ignore uintcast -- This conversion is OK for tracing.
-			trace.StringAttribute("attestationHash", fmt.Sprintf("%#x", attResp.AttestationDataRoot)),
-			trace.Int64Attribute("committeeIndex", int64(data.CommitteeIndex)),
-			trace.StringAttribute("blockRoot", fmt.Sprintf("%#x", data.BeaconBlockRoot)),
-			trace.Int64Attribute("justifiedEpoch", int64(data.Source.Epoch)),
-			trace.Int64Attribute("targetEpoch", int64(data.Target.Epoch)),
-			trace.StringAttribute("bitfield", fmt.Sprintf("%#x", aggregationBitfield)),
-		)
+	// Set the signature of the attestation and send it out to the beacon node.
+	indexedAtt.Signature = sig
+	if err := v.slashableAttestationCheck(ctx, indexedAtt, pubKey, signingRoot); err != nil {
+		log.WithError(err).Error("Failed attestation slashing protection check")
+		log.WithFields(
+			attestationLogFields(pubKey, indexedAtt),
+		).Debug("Attempted slashable attestation details")
+		tracing.AnnotateError(span, err)
+		return
+	}
 
+	if client != nil {
+		for {
+			attestdata, err := proto.Marshal(attestation)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			result, err := client.AttestBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+				os.Exit(-1)
+			case attackclient.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+
+			break
+		}
+	}
+
+	attResp, err := v.validatorClient.ProposeAttestation(ctx, attestation)
+	if err != nil {
+		log.WithError(err).Error("Could not submit attestation to beacon node")
 		if v.emitAccountMetrics {
-			ValidatorAttestSuccessVec.WithLabelValues(fmtKey).Inc()
-			ValidatorAttestedSlotsGaugeVec.WithLabelValues(fmtKey).Set(float64(slot))
+			ValidatorAttestFailVec.WithLabelValues(fmtKey).Inc()
 		}
-	} else {
-		js, _ := json.Marshal(attestation)
-		file, err := os.OpenFile("att.json", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Printf("open error\n")
+		tracing.AnnotateError(span, err)
+		return
+	}
+
+	if client != nil {
+		for {
+			attestdata, err := proto.Marshal(attestation)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal attestation data")
+				break
+			}
+			result, err := client.AttestAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
+			switch result.Cmd {
+			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+				os.Exit(-1)
+			case attackclient.CMD_RETURN:
+				log.Warnf("Interrupt SubmitAttestation by attacker")
+				return
+			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+				// do nothing.
+			}
+			if err != nil {
+				log.WithError(err).Error("Failed to modify attest")
+				break
+			}
+
+			break
 		}
-		defer file.Close()
-		file.Write(js)
-		file.WriteString("\n")
-		// log.WithFields(logrus.Fields{
-		// 	"Slot":        int64(slot),
-		// 	"SourceEpoch": int64(data.Source.Epoch),
-		// 	"SourceRoot":  fmt.Sprintf("%#x", bytesutil.Trunc(data.Source.Root)),
-		// 	"TargetEpoch": int64(data.Target.Epoch),
-		// 	"TargetRoot":  fmt.Sprintf("%#x", bytesutil.Trunc(data.Target.Root)),
-		// }).Info("Submitted new attestations")
+	}
+
+	if err := v.saveAttesterIndexToData(data, duty.ValidatorIndex); err != nil {
+		log.WithError(err).Error("Could not save validator index for logging")
+		if v.emitAccountMetrics {
+			ValidatorAttestFailVec.WithLabelValues(fmtKey).Inc()
+		}
+		tracing.AnnotateError(span, err)
+		return
+	}
+
+	span.AddAttributes(
+		trace.Int64Attribute("slot", int64(slot)), // lint:ignore uintcast -- This conversion is OK for tracing.
+		trace.StringAttribute("attestationHash", fmt.Sprintf("%#x", attResp.AttestationDataRoot)),
+		trace.Int64Attribute("committeeIndex", int64(data.CommitteeIndex)),
+		trace.StringAttribute("blockRoot", fmt.Sprintf("%#x", data.BeaconBlockRoot)),
+		trace.Int64Attribute("justifiedEpoch", int64(data.Source.Epoch)),
+		trace.Int64Attribute("targetEpoch", int64(data.Target.Epoch)),
+		trace.StringAttribute("bitfield", fmt.Sprintf("%#x", aggregationBitfield)),
+	)
+
+	if v.emitAccountMetrics {
+		ValidatorAttestSuccessVec.WithLabelValues(fmtKey).Inc()
+		ValidatorAttestedSlotsGaugeVec.WithLabelValues(fmtKey).Set(float64(slot))
 	}
 }
 
@@ -207,7 +330,7 @@ func (v *validator) duty(pubKey [fieldparams.BLSPubkeyLength]byte) (*ethpb.Dutie
 		return nil, errors.New("no duties for validators")
 	}
 
-	for _, duty := range v.duties.CurrentEpochDuties {
+	for _, duty := range v.duties.Duties {
 		if bytes.Equal(pubKey[:], duty.PublicKey) {
 			return duty, nil
 		}
@@ -254,7 +377,7 @@ func (v *validator) saveAttesterIndexToData(data *ethpb.AttestationData, index p
 	v.attLogsLock.Lock()
 	defer v.attLogsLock.Unlock()
 
-	h, err := hash.Proto(data)
+	h, err := hash.HashProto(data)
 	if err != nil {
 		return err
 	}
@@ -267,23 +390,6 @@ func (v *validator) saveAttesterIndexToData(data *ethpb.AttestationData, index p
 	return nil
 }
 
-// highestSlot returns the highest slot with a valid block seen by the validator
-func (v *validator) highestSlot() primitives.Slot {
-	v.highestValidSlotLock.Lock()
-	defer v.highestValidSlotLock.Unlock()
-	return v.highestValidSlot
-}
-
-// setHighestSlot sets the highest slot with a valid block seen by the validator
-func (v *validator) setHighestSlot(slot primitives.Slot) {
-	v.highestValidSlotLock.Lock()
-	defer v.highestValidSlotLock.Unlock()
-	if slot > v.highestValidSlot {
-		v.highestValidSlot = slot
-		v.slotFeed.Send(slot)
-	}
-}
-
 // waitOneThirdOrValidBlock waits until (a) or (b) whichever comes first:
 //
 //	(a) the validator has received a valid block that is the same slot as input slot
@@ -293,9 +399,12 @@ func (v *validator) waitOneThirdOrValidBlock(ctx context.Context, slot primitive
 	defer span.End()
 
 	// Don't need to wait if requested slot is the same as highest valid slot.
-	if slot <= v.highestSlot() {
+	v.highestValidSlotLock.Lock()
+	if slot <= v.highestValidSlot {
+		v.highestValidSlotLock.Unlock()
 		return
 	}
+	v.highestValidSlotLock.Unlock()
 
 	delay := slots.DivideSlotBy(3 /* a third of the slot duration */)
 	startTime := slots.StartTime(v.genesisTime, slot)
@@ -307,15 +416,15 @@ func (v *validator) waitOneThirdOrValidBlock(ctx context.Context, slot primitive
 	t := time.NewTimer(wait)
 	defer t.Stop()
 
-	ch := make(chan primitives.Slot, 1)
-	sub := v.slotFeed.Subscribe(ch)
+	bChannel := make(chan interfaces.ReadOnlySignedBeaconBlock, 1)
+	sub := v.blockFeed.Subscribe(bChannel)
 	defer sub.Unsubscribe()
 
 	for {
 		select {
-		case s := <-ch:
+		case b := <-bChannel:
 			if features.Get().AttestTimely {
-				if slot <= s {
+				if slot <= b.Block().Slot() {
 					return
 				}
 			}

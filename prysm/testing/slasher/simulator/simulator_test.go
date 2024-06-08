@@ -34,7 +34,7 @@ func setupService(t *testing.T, params *Parameters) *Simulator {
 	err = beaconState.SetValidators(validators)
 	require.NoError(t, err)
 
-	gen := mockstategen.NewService()
+	gen := mockstategen.NewMockService()
 	gen.AddStateForRoot(beaconState, [32]byte{})
 	return &Simulator{
 		srvConfig: &ServiceConfig{

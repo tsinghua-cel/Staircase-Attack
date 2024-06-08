@@ -3,26 +3,7 @@
 // This file is used in fuzzer builds to bypass proposer indices caches.
 package cache
 
-import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	forkchoicetypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/types"
-	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
-)
-
-var (
-	// ProposerIndicesCacheMiss tracks the number of proposerIndices requests that aren't present in the cache.
-	ProposerIndicesCacheMiss = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "proposer_indices_cache_miss",
-		Help: "The number of proposer indices requests that aren't present in the cache.",
-	})
-	// ProposerIndicesCacheHit tracks the number of proposerIndices requests that are in the cache.
-	ProposerIndicesCacheHit = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "proposer_indices_cache_hit",
-		Help: "The number of proposer indices requests that are present in the cache.",
-	})
-)
+import "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 
 // FakeProposerIndicesCache is a struct with 1 queue for looking up proposer indices by root.
 type FakeProposerIndicesCache struct {
@@ -33,31 +14,26 @@ func NewProposerIndicesCache() *FakeProposerIndicesCache {
 	return &FakeProposerIndicesCache{}
 }
 
-// ProposerIndices is a stub.
-func (c *FakeProposerIndicesCache) ProposerIndices(_ primitives.Epoch, _ [32]byte) ([fieldparams.SlotsPerEpoch]primitives.ValidatorIndex, bool) {
-	return [fieldparams.SlotsPerEpoch]primitives.ValidatorIndex{}, false
+// AddProposerIndices adds ProposerIndices object to the cache.
+// This method also trims the least recently list if the cache size has ready the max cache size limit.
+func (c *FakeProposerIndicesCache) AddProposerIndices(p *ProposerIndices) error {
+	return nil
 }
 
-// UnsafeProposerIndices is a stub.
-func (c *FakeProposerIndicesCache) UnsafeProposerIndices(_ primitives.Epoch, _ [32]byte) ([fieldparams.SlotsPerEpoch]primitives.ValidatorIndex, bool) {
-	return [fieldparams.SlotsPerEpoch]primitives.ValidatorIndex{}, false
+// ProposerIndices returns the proposer indices of a block root seed.
+func (c *FakeProposerIndicesCache) ProposerIndices(r [32]byte) ([]primitives.ValidatorIndex, error) {
+	return nil, nil
 }
 
-// Prune is a stub.
-func (p *FakeProposerIndicesCache) Prune(epoch primitives.Epoch) {}
-
-// Set is a stub.
-func (p *FakeProposerIndicesCache) Set(epoch primitives.Epoch, root [32]byte, indices [fieldparams.SlotsPerEpoch]primitives.ValidatorIndex) {
+// HasProposerIndices returns the proposer indices of a block root seed.
+func (c *FakeProposerIndicesCache) HasProposerIndices(r [32]byte) (bool, error) {
+	return false, nil
 }
 
-// SetUnsafe is a stub.
-func (p *FakeProposerIndicesCache) SetUnsafe(epoch primitives.Epoch, root [32]byte, indices [fieldparams.SlotsPerEpoch]primitives.ValidatorIndex) {
+func (c *FakeProposerIndicesCache) Len() int {
+	return 0
 }
 
-// SetCheckpoint is a stub.
-func (p *FakeProposerIndicesCache) SetCheckpoint(c forkchoicetypes.Checkpoint, root [32]byte) {}
-
-// IndicesFromCheckpoint is a stub.
-func (p *FakeProposerIndicesCache) IndicesFromCheckpoint(_ forkchoicetypes.Checkpoint) ([fieldparams.SlotsPerEpoch]primitives.ValidatorIndex, bool) {
-	return [fieldparams.SlotsPerEpoch]primitives.ValidatorIndex{}, false
+// Clear is a stub.
+func (c *FakeProposerIndicesCache) Clear() {
 }

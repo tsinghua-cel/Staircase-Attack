@@ -1,10 +1,9 @@
 package beacon_api
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	neturl "net/url"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -12,24 +11,32 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 )
 
-type StateValidatorsProvider interface {
-	GetStateValidators(context.Context, []string, []primitives.ValidatorIndex, []string) (*beacon.GetValidatorsResponse, error)
+type stateValidatorsProvider interface {
+	GetStateValidators(context.Context, []string, []int64, []string) (*beacon.GetValidatorsResponse, error)
 	GetStateValidatorsForSlot(context.Context, primitives.Slot, []string, []primitives.ValidatorIndex, []string) (*beacon.GetValidatorsResponse, error)
 	GetStateValidatorsForHead(context.Context, []string, []primitives.ValidatorIndex, []string) (*beacon.GetValidatorsResponse, error)
 }
 
 type beaconApiStateValidatorsProvider struct {
-	jsonRestHandler JsonRestHandler
+	jsonRestHandler jsonRestHandler
 }
 
 func (c beaconApiStateValidatorsProvider) GetStateValidators(
 	ctx context.Context,
 	stringPubkeys []string,
-	indexes []primitives.ValidatorIndex,
+	indexes []int64,
 	statuses []string,
 ) (*beacon.GetValidatorsResponse, error) {
-	stringIndices := convertValidatorIndicesToStrings(indexes)
-	return c.getStateValidatorsHelper(ctx, "/eth/v1/beacon/states/head/validators", append(stringIndices, stringPubkeys...), statuses)
+	params := neturl.Values{}
+	indexesSet := make(map[int64]struct{}, len(indexes))
+	for _, index := range indexes {
+		if _, ok := indexesSet[index]; !ok {
+			indexesSet[index] = struct{}{}
+			params.Add("id", strconv.FormatInt(index, 10))
+		}
+	}
+
+	return c.getStateValidatorsHelper(ctx, "/eth/v1/beacon/states/head/validators", params, stringPubkeys, statuses)
 }
 
 func (c beaconApiStateValidatorsProvider) GetStateValidatorsForSlot(
@@ -39,9 +46,9 @@ func (c beaconApiStateValidatorsProvider) GetStateValidatorsForSlot(
 	indices []primitives.ValidatorIndex,
 	statuses []string,
 ) (*beacon.GetValidatorsResponse, error) {
-	stringIndices := convertValidatorIndicesToStrings(indices)
+	params := convertValidatorIndicesToParams(indices)
 	url := fmt.Sprintf("/eth/v1/beacon/states/%d/validators", slot)
-	return c.getStateValidatorsHelper(ctx, url, append(stringIndices, stringPubkeys...), statuses)
+	return c.getStateValidatorsHelper(ctx, url, params, stringPubkeys, statuses)
 }
 
 func (c beaconApiStateValidatorsProvider) GetStateValidatorsForHead(
@@ -50,53 +57,51 @@ func (c beaconApiStateValidatorsProvider) GetStateValidatorsForHead(
 	indices []primitives.ValidatorIndex,
 	statuses []string,
 ) (*beacon.GetValidatorsResponse, error) {
-	stringIndices := convertValidatorIndicesToStrings(indices)
-	return c.getStateValidatorsHelper(ctx, "/eth/v1/beacon/states/head/validators", append(stringIndices, stringPubkeys...), statuses)
+	params := convertValidatorIndicesToParams(indices)
+	return c.getStateValidatorsHelper(ctx, "/eth/v1/beacon/states/head/validators", params, stringPubkeys, statuses)
 }
 
-func convertValidatorIndicesToStrings(indices []primitives.ValidatorIndex) []string {
-	var result []string
+func convertValidatorIndicesToParams(indices []primitives.ValidatorIndex) neturl.Values {
+	params := neturl.Values{}
 	indicesSet := make(map[primitives.ValidatorIndex]struct{}, len(indices))
 	for _, index := range indices {
 		if _, ok := indicesSet[index]; !ok {
 			indicesSet[index] = struct{}{}
-			result = append(result, strconv.FormatUint(uint64(index), 10))
+			params.Add("id", strconv.FormatUint(uint64(index), 10))
 		}
 	}
-	return result
+	return params
 }
 
 func (c beaconApiStateValidatorsProvider) getStateValidatorsHelper(
 	ctx context.Context,
 	endpoint string,
-	vals []string,
+	params neturl.Values,
+	stringPubkeys []string,
 	statuses []string,
 ) (*beacon.GetValidatorsResponse, error) {
-	req := beacon.GetValidatorsRequest{
-		Ids:      []string{},
-		Statuses: []string{},
-	}
-	req.Statuses = append(req.Statuses, statuses...)
+	stringPubKeysSet := make(map[string]struct{}, len(stringPubkeys))
 
-	valSet := make(map[string]struct{}, len(vals))
-	for _, v := range vals {
-		if _, ok := valSet[v]; !ok {
-			valSet[v] = struct{}{}
-			req.Ids = append(req.Ids, v)
+	for _, stringPubkey := range stringPubkeys {
+		if _, ok := stringPubKeysSet[stringPubkey]; !ok {
+			stringPubKeysSet[stringPubkey] = struct{}{}
+			params.Add("id", stringPubkey)
 		}
 	}
 
-	reqBytes, err := json.Marshal(req)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal request into JSON")
+	for _, status := range statuses {
+		params.Add("status", status)
 	}
+
+	url := buildURL(endpoint, params)
 	stateValidatorsJson := &beacon.GetValidatorsResponse{}
-	if err = c.jsonRestHandler.Post(ctx, endpoint, nil, bytes.NewBuffer(reqBytes), stateValidatorsJson); err != nil {
-		return nil, err
+
+	if _, err := c.jsonRestHandler.GetRestJsonResponse(ctx, url, stateValidatorsJson); err != nil {
+		return &beacon.GetValidatorsResponse{}, errors.Wrap(err, "failed to get json response")
 	}
 
 	if stateValidatorsJson.Data == nil {
-		return nil, errors.New("stateValidatorsJson.Data is nil")
+		return &beacon.GetValidatorsResponse{}, errors.New("stateValidatorsJson.Data is nil")
 	}
 
 	return stateValidatorsJson, nil

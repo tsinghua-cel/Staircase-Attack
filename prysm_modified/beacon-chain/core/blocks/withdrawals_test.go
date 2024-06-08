@@ -18,6 +18,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
 	"github.com/prysmaticlabs/prysm/v4/encoding/ssz"
 	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	"github.com/prysmaticlabs/prysm/v4/proto/migration"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
@@ -1134,9 +1135,12 @@ func TestProcessBLSToExecutionChanges(t *testing.T) {
 	bpb := &ethpb.BeaconBlockCapella{
 		Body: body,
 	}
-	bb, err := consensusblocks.NewBeaconBlock(bpb)
+	sbpb := &ethpb.SignedBeaconBlockCapella{
+		Block: bpb,
+	}
+	signed, err := consensusblocks.NewSignedBeaconBlock(sbpb)
 	require.NoError(t, err)
-	st, err = blocks.ProcessBLSToExecutionChanges(st, bb)
+	st, err = blocks.ProcessBLSToExecutionChanges(st, signed)
 	require.NoError(t, err)
 	vals := st.Validators()
 	for _, val := range vals {
@@ -1205,7 +1209,8 @@ func TestBLSChangesSignatureBatch(t *testing.T) {
 	require.Equal(t, true, verify)
 
 	// Verify a single change
-	require.NoError(t, blocks.VerifyBLSChangeSignature(st, signedChanges[0]))
+	change := migration.V1Alpha1SignedBLSToExecChangeToV2(signedChanges[0])
+	require.NoError(t, blocks.VerifyBLSChangeSignature(st, change))
 }
 
 func TestBLSChangesSignatureBatchWrongFork(t *testing.T) {
@@ -1269,7 +1274,8 @@ func TestBLSChangesSignatureBatchWrongFork(t *testing.T) {
 	require.Equal(t, false, verify)
 
 	// Verify a single change
-	require.ErrorIs(t, signing.ErrSigFailedToVerify, blocks.VerifyBLSChangeSignature(st, signedChanges[0]))
+	change := migration.V1Alpha1SignedBLSToExecChangeToV2(signedChanges[0])
+	require.ErrorIs(t, signing.ErrSigFailedToVerify, blocks.VerifyBLSChangeSignature(st, change))
 }
 
 func TestBLSChangesSignatureBatchFromBellatrix(t *testing.T) {
@@ -1356,6 +1362,7 @@ func TestBLSChangesSignatureBatchFromBellatrix(t *testing.T) {
 	require.Equal(t, true, verify)
 
 	// Verify a single change
-	require.NoError(t, blocks.VerifyBLSChangeSignature(st, signedChanges[0]))
+	change := migration.V1Alpha1SignedBLSToExecChangeToV2(signedChanges[0])
+	require.NoError(t, blocks.VerifyBLSChangeSignature(st, change))
 	params.OverrideBeaconConfig(savedConfig)
 }

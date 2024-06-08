@@ -15,22 +15,21 @@ import (
 )
 
 func TestProposeBeaconBlock_BlindedDeneb(t *testing.T) {
-	t.Skip("TODO: Fix this in the beacon-API PR")
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
-	var block shared.SignedBlindedBeaconBlockDeneb
-	err := json.Unmarshal([]byte(rpctesting.BlindedDenebBlock), &block)
+	var blockContents shared.SignedBlindedBeaconBlockContentsDeneb
+	err := json.Unmarshal([]byte(rpctesting.BlindedDenebBlockContents), &blockContents)
 	require.NoError(t, err)
-	genericSignedBlock, err := block.ToGeneric()
+	genericSignedBlock, err := blockContents.ToGeneric()
 	require.NoError(t, err)
 
-	denebBytes, err := json.Marshal(block)
+	denebBytes, err := json.Marshal(blockContents)
 	require.NoError(t, err)
 	// Make sure that what we send in the POST body is the marshalled version of the protobuf block
 	headers := map[string]string{"Eth-Consensus-Version": "deneb"}
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler.EXPECT().PostRestJson(
 		context.Background(),
 		"/eth/v1/beacon/blinded_blocks",
 		headers,
@@ -43,7 +42,7 @@ func TestProposeBeaconBlock_BlindedDeneb(t *testing.T) {
 	assert.NoError(t, err)
 	require.NotNil(t, proposeResponse)
 
-	expectedBlockRoot, err := genericSignedBlock.GetBlindedDeneb().HashTreeRoot()
+	expectedBlockRoot, err := genericSignedBlock.GetBlindedDeneb().SignedBlindedBlock.HashTreeRoot()
 	require.NoError(t, err)
 
 	// Make sure that the block root is set

@@ -13,7 +13,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/backfill/coverage"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/backfill"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
@@ -51,7 +51,7 @@ type State struct {
 	finalizedInfo           *finalizedInfo
 	epochBoundaryStateCache *epochBoundaryState
 	saveHotStateDB          *saveHotStateDbConfig
-	avb                     coverage.AvailableBlocker
+	backfillStatus          *backfill.Status
 	migrationLock           *sync.Mutex
 	fc                      forkchoice.ForkChoicer
 }
@@ -75,19 +75,17 @@ type finalizedInfo struct {
 	lock  sync.RWMutex
 }
 
-// Option is a functional option for controlling the initialization of a *State value
-type Option func(*State)
+// StateGenOption is a functional option for controlling the initialization of a *State value
+type StateGenOption func(*State)
 
-// WithAvailableBlocker gives stategen an AvailableBlocker, which is used to determine if a given
-// block is available. This is necessary because backfill creates a hole in the block history.
-func WithAvailableBlocker(avb coverage.AvailableBlocker) Option {
+func WithBackfillStatus(bfs *backfill.Status) StateGenOption {
 	return func(sg *State) {
-		sg.avb = avb
+		sg.backfillStatus = bfs
 	}
 }
 
 // New returns a new state management object.
-func New(beaconDB db.NoHeadAccessDatabase, fc forkchoice.ForkChoicer, opts ...Option) *State {
+func New(beaconDB db.NoHeadAccessDatabase, fc forkchoice.ForkChoicer, opts ...StateGenOption) *State {
 	s := &State{
 		beaconDB:                beaconDB,
 		hotStateCache:           newHotStateCache(),

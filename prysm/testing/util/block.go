@@ -77,6 +77,19 @@ func NewBeaconBlock() *ethpb.SignedBeaconBlock {
 	}
 }
 
+func NewBlobsidecar() *ethpb.SignedBlobSidecar {
+	return &ethpb.SignedBlobSidecar{
+		Message: &ethpb.BlobSidecar{
+			BlockRoot:       make([]byte, fieldparams.RootLength),
+			BlockParentRoot: make([]byte, fieldparams.RootLength),
+			Blob:            make([]byte, fieldparams.BlobLength),
+			KzgCommitment:   make([]byte, fieldparams.BLSPubkeyLength),
+			KzgProof:        make([]byte, fieldparams.BLSPubkeyLength),
+		},
+		Signature: make([]byte, fieldparams.BLSSignatureLength),
+	}
+}
+
 // GenerateFullBlock generates a fully valid block with the requested parameters.
 // Use BlockGenConfig to declare the conditions you would like the block generated under.
 func GenerateFullBlock(
@@ -653,10 +666,9 @@ func HydrateV2BellatrixBeaconBlockBody(b *v2.BeaconBlockBodyBellatrix) *v2.Beaco
 			ReceiptsRoot:  make([]byte, fieldparams.RootLength),
 			LogsBloom:     make([]byte, 256),
 			PrevRandao:    make([]byte, fieldparams.RootLength),
-			ExtraData:     make([]byte, 0),
+			ExtraData:     make([]byte, fieldparams.RootLength),
 			BaseFeePerGas: make([]byte, fieldparams.RootLength),
 			BlockHash:     make([]byte, fieldparams.RootLength),
-			Transactions:  make([][]byte, 0),
 		}
 	}
 	return b
@@ -773,10 +785,10 @@ func HydrateBeaconBlockBodyBellatrix(b *ethpb.BeaconBlockBodyBellatrix) *ethpb.B
 			ReceiptsRoot:  make([]byte, fieldparams.RootLength),
 			LogsBloom:     make([]byte, 256),
 			PrevRandao:    make([]byte, fieldparams.RootLength),
-			ExtraData:     make([]byte, 0),
 			BaseFeePerGas: make([]byte, fieldparams.RootLength),
 			BlockHash:     make([]byte, fieldparams.RootLength),
 			Transactions:  make([][]byte, 0),
+			ExtraData:     make([]byte, 0),
 		}
 	}
 	return b
@@ -840,10 +852,10 @@ func HydrateBlindedBeaconBlockBodyBellatrix(b *ethpb.BlindedBeaconBlockBodyBella
 			ReceiptsRoot:     make([]byte, fieldparams.RootLength),
 			LogsBloom:        make([]byte, 256),
 			PrevRandao:       make([]byte, 32),
-			ExtraData:        make([]byte, 0),
 			BaseFeePerGas:    make([]byte, 32),
 			BlockHash:        make([]byte, 32),
 			TransactionsRoot: make([]byte, fieldparams.RootLength),
+			ExtraData:        make([]byte, 0),
 		}
 	}
 	return b
@@ -907,7 +919,6 @@ func HydrateV2BlindedBeaconBlockBodyBellatrix(b *v2.BlindedBeaconBlockBodyBellat
 			ReceiptsRoot:     make([]byte, fieldparams.RootLength),
 			LogsBloom:        make([]byte, 256),
 			PrevRandao:       make([]byte, 32),
-			ExtraData:        make([]byte, 0),
 			BaseFeePerGas:    make([]byte, 32),
 			BlockHash:        make([]byte, 32),
 			TransactionsRoot: make([]byte, fieldparams.RootLength),
@@ -974,11 +985,10 @@ func HydrateBeaconBlockBodyCapella(b *ethpb.BeaconBlockBodyCapella) *ethpb.Beaco
 			ReceiptsRoot:  make([]byte, fieldparams.RootLength),
 			LogsBloom:     make([]byte, 256),
 			PrevRandao:    make([]byte, fieldparams.RootLength),
-			ExtraData:     make([]byte, 0),
 			BaseFeePerGas: make([]byte, fieldparams.RootLength),
 			BlockHash:     make([]byte, fieldparams.RootLength),
 			Transactions:  make([][]byte, 0),
-			Withdrawals:   make([]*enginev1.Withdrawal, 0),
+			ExtraData:     make([]byte, 0),
 		}
 	}
 	return b
@@ -1042,10 +1052,10 @@ func HydrateBlindedBeaconBlockBodyCapella(b *ethpb.BlindedBeaconBlockBodyCapella
 			ReceiptsRoot:     make([]byte, fieldparams.RootLength),
 			LogsBloom:        make([]byte, 256),
 			PrevRandao:       make([]byte, 32),
-			ExtraData:        make([]byte, 0),
 			BaseFeePerGas:    make([]byte, 32),
 			BlockHash:        make([]byte, 32),
 			TransactionsRoot: make([]byte, fieldparams.RootLength),
+			ExtraData:        make([]byte, 0),
 			WithdrawalsRoot:  make([]byte, fieldparams.RootLength),
 		}
 	}
@@ -1110,7 +1120,6 @@ func HydrateV2BlindedBeaconBlockBodyCapella(b *v2.BlindedBeaconBlockBodyCapella)
 			ReceiptsRoot:     make([]byte, fieldparams.RootLength),
 			LogsBloom:        make([]byte, 256),
 			PrevRandao:       make([]byte, 32),
-			ExtraData:        make([]byte, 0),
 			BaseFeePerGas:    make([]byte, 32),
 			BlockHash:        make([]byte, 32),
 			TransactionsRoot: make([]byte, fieldparams.RootLength),
@@ -1130,20 +1139,10 @@ func SaveBlock(tb assertions.AssertionTestingTB, ctx context.Context, db iface.N
 // HydrateSignedBeaconBlockDeneb hydrates a signed beacon block with correct field length sizes
 // to comply with fssz marshalling and unmarshalling rules.
 func HydrateSignedBeaconBlockDeneb(b *ethpb.SignedBeaconBlockDeneb) *ethpb.SignedBeaconBlockDeneb {
-	if b == nil {
-		b = &ethpb.SignedBeaconBlockDeneb{}
-	}
 	if b.Signature == nil {
 		b.Signature = make([]byte, fieldparams.BLSSignatureLength)
 	}
 	b.Block = HydrateBeaconBlockDeneb(b.Block)
-	return b
-}
-
-// HydrateSignedBeaconBlockContentsDeneb hydrates a signed beacon block with correct field length sizes
-// to comply with fssz marshalling and unmarshalling rules.
-func HydrateSignedBeaconBlockContentsDeneb(b *ethpb.SignedBeaconBlockContentsDeneb) *ethpb.SignedBeaconBlockContentsDeneb {
-	b.Block = HydrateSignedBeaconBlockDeneb(b.Block)
 	return b
 }
 
@@ -1221,11 +1220,10 @@ func HydrateBeaconBlockBodyDeneb(b *ethpb.BeaconBlockBodyDeneb) *ethpb.BeaconBlo
 			ReceiptsRoot:  make([]byte, fieldparams.RootLength),
 			LogsBloom:     make([]byte, 256),
 			PrevRandao:    make([]byte, fieldparams.RootLength),
-			ExtraData:     make([]byte, 0),
 			BaseFeePerGas: make([]byte, fieldparams.RootLength),
 			BlockHash:     make([]byte, fieldparams.RootLength),
 			Transactions:  make([][]byte, 0),
-			Withdrawals:   make([]*enginev1.Withdrawal, 0),
+			ExtraData:     make([]byte, 0),
 		}
 	}
 	return b
@@ -1263,11 +1261,10 @@ func HydrateV2BeaconBlockBodyDeneb(b *v2.BeaconBlockBodyDeneb) *v2.BeaconBlockBo
 			ReceiptsRoot:  make([]byte, fieldparams.RootLength),
 			LogsBloom:     make([]byte, 256),
 			PrevRandao:    make([]byte, fieldparams.RootLength),
-			ExtraData:     make([]byte, 0),
 			BaseFeePerGas: make([]byte, fieldparams.RootLength),
 			BlockHash:     make([]byte, fieldparams.RootLength),
 			Transactions:  make([][]byte, 0),
-			Withdrawals:   make([]*enginev1.Withdrawal, 0),
+			ExtraData:     make([]byte, 0),
 		}
 	}
 	return b
@@ -1357,10 +1354,10 @@ func HydrateBlindedBeaconBlockBodyDeneb(b *ethpb.BlindedBeaconBlockBodyDeneb) *e
 			ReceiptsRoot:     make([]byte, fieldparams.RootLength),
 			LogsBloom:        make([]byte, 256),
 			PrevRandao:       make([]byte, 32),
-			ExtraData:        make([]byte, 0),
 			BaseFeePerGas:    make([]byte, 32),
 			BlockHash:        make([]byte, 32),
 			TransactionsRoot: make([]byte, fieldparams.RootLength),
+			ExtraData:        make([]byte, 0),
 			WithdrawalsRoot:  make([]byte, fieldparams.RootLength),
 		}
 	}
@@ -1399,10 +1396,10 @@ func HydrateV2BlindedBeaconBlockBodyDeneb(b *v2.BlindedBeaconBlockBodyDeneb) *v2
 			ReceiptsRoot:     make([]byte, fieldparams.RootLength),
 			LogsBloom:        make([]byte, 256),
 			PrevRandao:       make([]byte, 32),
-			ExtraData:        make([]byte, 0),
 			BaseFeePerGas:    make([]byte, 32),
 			BlockHash:        make([]byte, 32),
 			TransactionsRoot: make([]byte, fieldparams.RootLength),
+			ExtraData:        make([]byte, 0),
 			WithdrawalsRoot:  make([]byte, fieldparams.RootLength),
 		}
 	}

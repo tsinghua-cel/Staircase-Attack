@@ -32,7 +32,7 @@ func RunAttestationTest(t *testing.T, config string) {
 
 			body := &ethpb.BeaconBlockBodyDeneb{Attestations: []*ethpb.Attestation{att}}
 			processAtt := func(ctx context.Context, st state.BeaconState, blk interfaces.SignedBeaconBlock) (state.BeaconState, error) {
-				st, err = altair.ProcessAttestationsNoVerifySignature(ctx, st, blk.Block())
+				st, err = altair.ProcessAttestationsNoVerifySignature(ctx, st, blk)
 				if err != nil {
 					return nil, err
 				}

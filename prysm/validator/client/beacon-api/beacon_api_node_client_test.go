@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/mock/gomock"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/beacon"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/config"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/node"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/validator/client/beacon-api/mock"
@@ -22,7 +22,7 @@ func TestGetGenesis(t *testing.T) {
 		name                    string
 		genesisResponse         *beacon.Genesis
 		genesisError            error
-		depositContractResponse config.GetDepositContractResponse
+		depositContractResponse apimiddleware.DepositContractResponseJson
 		depositContractError    error
 		queriesDepositContract  bool
 		expectedResponse        *ethpb.Genesis
@@ -57,7 +57,7 @@ func TestGetGenesis(t *testing.T) {
 			},
 			depositContractError:   errors.New("foo error"),
 			queriesDepositContract: true,
-			expectedError:          "foo error",
+			expectedError:          "failed to query deposit contract information: foo error",
 		},
 		{
 			name: "fails to read nil deposit contract data",
@@ -66,7 +66,7 @@ func TestGetGenesis(t *testing.T) {
 				GenesisValidatorsRoot: hexutil.Encode([]byte{2}),
 			},
 			queriesDepositContract: true,
-			depositContractResponse: config.GetDepositContractResponse{
+			depositContractResponse: apimiddleware.DepositContractResponseJson{
 				Data: nil,
 			},
 			expectedError: "deposit contract data is nil",
@@ -78,8 +78,8 @@ func TestGetGenesis(t *testing.T) {
 				GenesisValidatorsRoot: hexutil.Encode([]byte{2}),
 			},
 			queriesDepositContract: true,
-			depositContractResponse: config.GetDepositContractResponse{
-				Data: &config.DepositContractData{
+			depositContractResponse: apimiddleware.DepositContractResponseJson{
+				Data: &apimiddleware.DepositContractJson{
 					Address: "foo",
 				},
 			},
@@ -92,8 +92,8 @@ func TestGetGenesis(t *testing.T) {
 				GenesisValidatorsRoot: hexutil.Encode([]byte{2}),
 			},
 			queriesDepositContract: true,
-			depositContractResponse: config.GetDepositContractResponse{
-				Data: &config.DepositContractData{
+			depositContractResponse: apimiddleware.DepositContractResponseJson{
+				Data: &apimiddleware.DepositContractJson{
 					Address: hexutil.Encode([]byte{3}),
 				},
 			},
@@ -113,23 +113,25 @@ func TestGetGenesis(t *testing.T) {
 			defer ctrl.Finish()
 			ctx := context.Background()
 
-			genesisProvider := mock.NewMockGenesisProvider(ctrl)
+			genesisProvider := mock.NewMockgenesisProvider(ctrl)
 			genesisProvider.EXPECT().GetGenesis(
 				ctx,
 			).Return(
 				testCase.genesisResponse,
+				nil,
 				testCase.genesisError,
 			)
 
-			depositContractJson := config.GetDepositContractResponse{}
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+			depositContractJson := apimiddleware.DepositContractResponseJson{}
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
 			if testCase.queriesDepositContract {
-				jsonRestHandler.EXPECT().Get(
+				jsonRestHandler.EXPECT().GetRestJsonResponse(
 					ctx,
 					"/eth/v1/config/deposit_contract",
 					&depositContractJson,
 				).Return(
+					nil,
 					testCase.depositContractError,
 				).SetArg(
 					2,
@@ -157,7 +159,7 @@ func TestGetSyncStatus(t *testing.T) {
 
 	testCases := []struct {
 		name                 string
-		restEndpointResponse node.SyncStatusResponse
+		restEndpointResponse apimiddleware.SyncingResponseJson
 		restEndpointError    error
 		expectedResponse     *ethpb.SyncStatus
 		expectedError        string
@@ -165,17 +167,17 @@ func TestGetSyncStatus(t *testing.T) {
 		{
 			name:              "fails to query REST endpoint",
 			restEndpointError: errors.New("foo error"),
-			expectedError:     "foo error",
+			expectedError:     "failed to get sync status: foo error",
 		},
 		{
 			name:                 "returns nil syncing data",
-			restEndpointResponse: node.SyncStatusResponse{Data: nil},
+			restEndpointResponse: apimiddleware.SyncingResponseJson{Data: nil},
 			expectedError:        "syncing data is nil",
 		},
 		{
 			name: "returns false syncing status",
-			restEndpointResponse: node.SyncStatusResponse{
-				Data: &node.SyncStatusResponseData{
+			restEndpointResponse: apimiddleware.SyncingResponseJson{
+				Data: &shared.SyncDetails{
 					IsSyncing: false,
 				},
 			},
@@ -185,8 +187,8 @@ func TestGetSyncStatus(t *testing.T) {
 		},
 		{
 			name: "returns true syncing status",
-			restEndpointResponse: node.SyncStatusResponse{
-				Data: &node.SyncStatusResponseData{
+			restEndpointResponse: apimiddleware.SyncingResponseJson{
+				Data: &shared.SyncDetails{
 					IsSyncing: true,
 				},
 			},
@@ -202,13 +204,14 @@ func TestGetSyncStatus(t *testing.T) {
 			defer ctrl.Finish()
 			ctx := context.Background()
 
-			syncingResponse := node.SyncStatusResponse{}
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-			jsonRestHandler.EXPECT().Get(
+			syncingResponse := apimiddleware.SyncingResponseJson{}
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
 				syncingEndpoint,
 				&syncingResponse,
 			).Return(
+				nil,
 				testCase.restEndpointError,
 			).SetArg(
 				2,
@@ -232,7 +235,7 @@ func TestGetVersion(t *testing.T) {
 
 	testCases := []struct {
 		name                 string
-		restEndpointResponse node.GetVersionResponse
+		restEndpointResponse apimiddleware.VersionResponseJson
 		restEndpointError    error
 		expectedResponse     *ethpb.Version
 		expectedError        string
@@ -240,17 +243,17 @@ func TestGetVersion(t *testing.T) {
 		{
 			name:              "fails to query REST endpoint",
 			restEndpointError: errors.New("foo error"),
-			expectedError:     "foo error",
+			expectedError:     "failed to query node version",
 		},
 		{
 			name:                 "returns nil version data",
-			restEndpointResponse: node.GetVersionResponse{Data: nil},
+			restEndpointResponse: apimiddleware.VersionResponseJson{Data: nil},
 			expectedError:        "empty version response",
 		},
 		{
 			name: "returns proper version response",
-			restEndpointResponse: node.GetVersionResponse{
-				Data: &node.Version{
+			restEndpointResponse: apimiddleware.VersionResponseJson{
+				Data: &apimiddleware.VersionJson{
 					Version: "prysm/local",
 				},
 			},
@@ -266,13 +269,14 @@ func TestGetVersion(t *testing.T) {
 			defer ctrl.Finish()
 			ctx := context.Background()
 
-			var versionResponse node.GetVersionResponse
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-			jsonRestHandler.EXPECT().Get(
+			var versionResponse apimiddleware.VersionResponseJson
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
 				versionEndpoint,
 				&versionResponse,
 			).Return(
+				nil,
 				testCase.restEndpointError,
 			).SetArg(
 				2,

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -73,28 +72,22 @@ func setupValidExit(t *testing.T) (*ethpb.SignedVoluntaryExit, state.BeaconState
 }
 
 func TestValidateVoluntaryExit_ValidExit(t *testing.T) {
-	cfg := params.BeaconConfig().Copy()
-	cfg.DenebForkEpoch = math.MaxUint64
-	params.OverrideBeaconConfig(cfg)
-	params.SetupTestConfigCleanup(t)
-
 	p := p2ptest.NewTestP2P(t)
 	ctx := context.Background()
 
 	exit, s := setupValidExit(t)
 
 	gt := time.Now()
-	mockChainService := &mock.ChainService{
-		State:   s,
-		Genesis: gt,
-	}
 	r := &Service{
 		cfg: &config{
-			p2p:               p,
-			chain:             mockChainService,
+			p2p: p,
+			chain: &mock.ChainService{
+				State:   s,
+				Genesis: gt,
+			},
 			clock:             startup.NewClock(gt, [32]byte{}),
 			initialSync:       &mockSync.Sync{IsSyncing: false},
-			operationNotifier: mockChainService.OperationNotifier(),
+			operationNotifier: (&mock.ChainService{}).OperationNotifier(),
 		},
 		seenExitCache: lruwrpr.New(10),
 	}
@@ -119,22 +112,25 @@ func TestValidateVoluntaryExit_ValidExit(t *testing.T) {
 	defer opSub.Unsubscribe()
 
 	res, err := r.validateVoluntaryExit(ctx, "", m)
-	require.NoError(t, err)
-	require.Equal(t, pubsub.ValidationAccept, res, "Failed validation")
-	require.NotNil(t, m.ValidatorData, "Decoded message was not set on the message validator data")
+	assert.NoError(t, err)
+	valid := res == pubsub.ValidationAccept
+	assert.Equal(t, true, valid, "Failed validation")
+	assert.NotNil(t, m.ValidatorData, "Decoded message was not set on the message validator data")
 
-	select {
-	case event := <-opChannel:
-		if event.Type == opfeed.ExitReceived {
-			_, ok := event.Data.(*opfeed.ExitReceivedData)
-			assert.Equal(t, true, ok, "Entity is not of type *opfeed.ExitReceivedData")
-		} else {
-			t.Error("Unexpected event type received")
+	// Ensure the state notification was broadcast.
+	notificationFound := false
+	for !notificationFound {
+		select {
+		case event := <-opChannel:
+			if event.Type == opfeed.ExitReceived {
+				notificationFound = true
+				_, ok := event.Data.(*opfeed.ExitReceivedData)
+				assert.Equal(t, true, ok, "Entity is not of type *opfeed.ExitReceivedData")
+			}
+		case <-opSub.Err():
+			t.Error("Subscription to state notifier failed")
+			return
 		}
-	case <-opSub.Err():
-		t.Error("Subscription to state notifier failed")
-	case <-time.After(10 * time.Second): // Timeout to prevent hanging tests
-		t.Error("Timeout waiting for exit notification")
 	}
 }
 

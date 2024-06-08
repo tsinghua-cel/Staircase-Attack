@@ -19,6 +19,8 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
+	"github.com/prysmaticlabs/prysm/v4/network"
+	"github.com/prysmaticlabs/prysm/v4/network/authorization"
 	v1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
@@ -87,7 +89,7 @@ type BuilderClient interface {
 	NodeURL() string
 	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte) (SignedBid, error)
 	RegisterValidator(ctx context.Context, svr []*ethpb.SignedValidatorRegistrationV1) error
-	SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlySignedBeaconBlock) (interfaces.ExecutionData, *v1.BlobsBundle, error)
+	SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlySignedBeaconBlock, blobs []*ethpb.SignedBlindedBlobSidecar) (interfaces.ExecutionData, *v1.BlobsBundle, error)
 	Status(ctx context.Context) error
 }
 
@@ -102,7 +104,8 @@ type Client struct {
 // `host` is the base host + port used to construct request urls. This value can be
 // a URL string, or NewClient will assume an http endpoint if just `host:port` is used.
 func NewClient(host string, opts ...ClientOpt) (*Client, error) {
-	u, err := urlForHost(host)
+	endpoint := covertEndPoint(host)
+	u, err := urlForHost(endpoint.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +121,8 @@ func NewClient(host string, opts ...ClientOpt) (*Client, error) {
 
 func urlForHost(h string) (*url.URL, error) {
 	// try to parse as url (being permissive)
-	if u, err := url.Parse(h); err == nil && u.Host != "" {
+	u, err := url.Parse(h)
+	if err == nil && u.Host != "" {
 		return u, nil
 	}
 	// try to parse as host:port
@@ -136,7 +140,7 @@ func (c *Client) NodeURL() string {
 
 type reqOption func(*http.Request)
 
-// do is a generic, opinionated request function to reduce boilerplate amongst the methods in this package api/client/builder.
+// do is a generic, opinionated request function to reduce boilerplate amongst the methods in this package api/client/builder/types.go.
 func (c *Client) do(ctx context.Context, method string, path string, body io.Reader, opts ...reqOption) (res []byte, err error) {
 	ctx, span := trace.StartSpan(ctx, "builder.client.do")
 	defer func() {
@@ -268,7 +272,11 @@ func (c *Client) RegisterValidator(ctx context.Context, svr []*ethpb.SignedValid
 	}
 	vs := make([]*shared.SignedValidatorRegistration, len(svr))
 	for i := 0; i < len(svr); i++ {
-		vs[i] = shared.SignedValidatorRegistrationFromConsensus(svr[i])
+		svrJson, err := shared.SignedValidatorRegistrationFromConsensus(svr[i])
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to encode to SignedValidatorRegistration at index %d", i))
+		}
+		vs[i] = svrJson
 	}
 	body, err := json.Marshal(vs)
 	if err != nil {
@@ -283,7 +291,7 @@ func (c *Client) RegisterValidator(ctx context.Context, svr []*ethpb.SignedValid
 
 // SubmitBlindedBlock calls the builder API endpoint that binds the validator to the builder and submits the block.
 // The response is the full execution payload used to create the blinded block.
-func (c *Client) SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlySignedBeaconBlock) (interfaces.ExecutionData, *v1.BlobsBundle, error) {
+func (c *Client) SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlySignedBeaconBlock, blobs []*ethpb.SignedBlindedBlobSidecar) (interfaces.ExecutionData, *v1.BlobsBundle, error) {
 	if !sb.IsBlinded() {
 		return nil, nil, errNotBlinded
 	}
@@ -367,9 +375,9 @@ func (c *Client) SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlyS
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "could not get protobuf block")
 		}
-		b, err := shared.SignedBlindedBeaconBlockDenebFromConsensus(&ethpb.SignedBlindedBeaconBlockDeneb{Message: psb.Message, Signature: bytesutil.SafeCopyBytes(psb.Signature)})
+		b, err := shared.SignedBlindedBeaconBlockContentsDenebFromConsensus(&ethpb.SignedBlindedBeaconBlockAndBlobsDeneb{SignedBlindedBlock: psb, SignedBlindedBlobSidecars: blobs})
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "could not convert SignedBlindedBeaconBlockDeneb to json marshalable type")
+			return nil, nil, errors.Wrapf(err, "could not convert SignedBlindedBeaconBlockContentsDeneb to json marshalable type")
 		}
 		body, err := json.Marshal(b)
 		if err != nil {
@@ -423,29 +431,38 @@ func non200Err(response *http.Response) error {
 	}
 	msg := fmt.Sprintf("code=%d, url=%s, body=%s", response.StatusCode, response.Request.URL, body)
 	switch response.StatusCode {
-	case http.StatusNoContent:
+	case 204:
 		log.WithError(ErrNoContent).Debug(msg)
 		return ErrNoContent
-	case http.StatusBadRequest:
+	case 400:
+		if jsonErr := json.Unmarshal(bodyBytes, &errMessage); jsonErr != nil {
+			return errors.Wrap(jsonErr, "unable to read response body")
+		}
 		log.WithError(ErrBadRequest).Debug(msg)
-		if jsonErr := json.Unmarshal(bodyBytes, &errMessage); jsonErr != nil {
-			return errors.Wrap(jsonErr, "unable to read response body")
-		}
 		return errors.Wrap(ErrBadRequest, errMessage.Message)
-	case http.StatusNotFound:
+	case 404:
+		if jsonErr := json.Unmarshal(bodyBytes, &errMessage); jsonErr != nil {
+			return errors.Wrap(jsonErr, "unable to read response body")
+		}
 		log.WithError(ErrNotFound).Debug(msg)
-		if jsonErr := json.Unmarshal(bodyBytes, &errMessage); jsonErr != nil {
-			return errors.Wrap(jsonErr, "unable to read response body")
-		}
 		return errors.Wrap(ErrNotFound, errMessage.Message)
-	case http.StatusInternalServerError:
-		log.WithError(ErrNotOK).Debug(msg)
+	case 500:
 		if jsonErr := json.Unmarshal(bodyBytes, &errMessage); jsonErr != nil {
 			return errors.Wrap(jsonErr, "unable to read response body")
 		}
+		log.WithError(ErrNotOK).Debug(msg)
 		return errors.Wrap(ErrNotOK, errMessage.Message)
 	default:
 		log.WithError(ErrNotOK).Debug(msg)
 		return errors.Wrap(ErrNotOK, fmt.Sprintf("unsupported error code: %d", response.StatusCode))
 	}
+}
+
+func covertEndPoint(ep string) network.Endpoint {
+	return network.Endpoint{
+		Url: ep,
+		Auth: network.AuthorizationData{ // Auth is not used for builder.
+			Method: authorization.None,
+			Value:  "",
+		}}
 }

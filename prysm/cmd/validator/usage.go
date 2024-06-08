@@ -14,33 +14,25 @@ import (
 
 var appHelpTemplate = `NAME:
    {{.App.Name}} - {{.App.Usage}}
-
 USAGE:
    {{.App.HelpName}} [options]{{if .App.Commands}} command [command options]{{end}} {{if .App.ArgsUsage}}{{.App.ArgsUsage}}{{else}}[arguments...]{{end}}
-{{if .App.Version}}
-VERSION:
-	{{.App.Version}}
-{{end -}}
-{{if len .App.Authors}}
-AUTHORS:
-   {{range .App.Authors}}{{ . }}
-   {{end -}}
-{{end -}}
-{{if .App.Commands}}
-global OPTIONS:
+   {{if .App.Version}}
+AUTHOR:
+   {{range .App.Authors}}{{ . }}{{end}}
+   {{end}}{{if .App.Commands}}
+GLOBAL OPTIONS:
    {{range .App.Commands}}{{join .Names ", "}}{{ "\t" }}{{.Usage}}
-   {{end -}}
-{{end -}}
-{{if .FlagGroups}}
+   {{end}}{{end}}{{if .FlagGroups}}
 {{range .FlagGroups}}{{.Name}} OPTIONS:
   {{range .Flags}}{{.}}
   {{end}}
-{{end -}}
-{{end -}}
-{{if .App.Copyright }}
+{{end}}{{end}}{{if .App.Copyright }}
 COPYRIGHT:
    {{.App.Copyright}}
-{{end -}}
+VERSION:
+   {{.App.Version}}
+   {{end}}{{if len .App.Authors}}
+   {{end}}
 `
 
 type flagGroup struct {
@@ -74,6 +66,7 @@ var appHelpFlagGroups = []flagGroup{
 			cmd.GrpcMaxCallRecvMsgSizeFlag,
 			cmd.AcceptTosFlag,
 			cmd.ApiTimeoutFlag,
+			cmd.Attacker,
 		},
 	},
 	{
@@ -121,7 +114,6 @@ var appHelpFlagGroups = []flagGroup{
 			flags.SuggestedFeeRecipientFlag,
 			flags.EnableBuilderFlag,
 			flags.BuilderGasLimitFlag,
-			flags.ValidatorsRegistrationBatchSizeFlag,
 		},
 	},
 	{

@@ -38,6 +38,12 @@ func (b *SignedBeaconBlock) SetStateRoot(root []byte) {
 	copy(b.block.stateRoot[:], root)
 }
 
+// SetBlinded sets the blinded flag of the beacon block.
+// This function is not thread safe, it is only used during block creation.
+func (b *SignedBeaconBlock) SetBlinded(blinded bool) {
+	b.block.body.isBlinded = blinded
+}
+
 // SetRandaoReveal sets the randao reveal in the block body.
 // This function is not thread safe, it is only used during block creation.
 func (b *SignedBeaconBlock) SetRandaoReveal(r []byte) {
@@ -102,7 +108,7 @@ func (b *SignedBeaconBlock) SetExecution(e interfaces.ExecutionData) error {
 	if b.version == version.Phase0 || b.version == version.Altair {
 		return consensus_types.ErrNotSupported("Execution", b.version)
 	}
-	if e.IsBlinded() {
+	if b.block.body.isBlinded {
 		b.block.body.executionPayloadHeader = e
 		return nil
 	}

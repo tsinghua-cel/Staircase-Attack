@@ -1,0 +1,210 @@
+basePath: /v1
+consumes:
+- application/json
+definitions:
+  dbmodel.BlockReward:
+    properties:
+      epoch:
+        description: epoch
+        type: integer
+      head_amount:
+        description: Head 奖励数量
+        type: integer
+      id:
+        description: 任务类型id
+        type: integer
+      target_amount:
+        description: Target 奖励数量
+        type: integer
+      validator_index:
+        description: 验证者索引
+        type: integer
+    type: object
+  types.AttestStrategy:
+    properties:
+      broad_cast_delay:
+        description: unit millisecond
+        type: integer
+      delay_enable:
+        type: boolean
+      modify_enable:
+        type: boolean
+    type: object
+  types.BlockStrategy:
+    properties:
+      broad_cast_delay:
+        description: unit millisecond
+        type: integer
+      delay_enable:
+        type: boolean
+      modify_enable:
+        type: boolean
+    type: object
+  types.ProposerDuty:
+    properties:
+      pubkey:
+        type: string
+      slot:
+        type: string
+      validator_index:
+        type: string
+    type: object
+  types.ReorgEvent:
+    properties:
+      depth:
+        type: integer
+      epoch:
+        type: integer
+      new_block_proposer_index:
+        type: integer
+      new_block_slot:
+        type: integer
+      new_head_state:
+        type: string
+      old_block_proposer_index:
+        type: integer
+      old_block_slot:
+        type: integer
+      old_head_state:
+        type: string
+      slot:
+        type: integer
+    type: object
+  types.SlotStrategy:
+    properties:
+      actions:
+        additionalProperties:
+          type: string
+        type: object
+      level:
+        type: integer
+      slot:
+        type: string
+    type: object
+  types.Strategy:
+    properties:
+      attest:
+        $ref: '#/definitions/types.AttestStrategy'
+      block:
+        $ref: '#/definitions/types.BlockStrategy'
+      slots:
+        items:
+          $ref: '#/definitions/types.SlotStrategy'
+        type: array
+      validator:
+        items:
+          $ref: '#/definitions/types.ValidatorStrategy'
+        type: array
+    type: object
+  types.ValidatorStrategy:
+    properties:
+      attacker_end_slot:
+        type: integer
+      attacker_start_slot:
+        type: integer
+      validator_index:
+        type: integer
+    type: object
+host: localhost:20001
+info:
+  contact: {}
+  description: This is the attacker service API server.
+  title: Attacker Service API
+  version: "1"
+paths:
+  /duties/{epoch}:
+    get:
+      consumes:
+      - application/json
+      description: get duties by epoch
+      operationId: get-duties-by-epoch
+      parameters:
+      - description: Epoch
+        in: path
+        name: epoch
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.ProposerDuty'
+            type: array
+      summary: Get duties by epoch
+  /reorgs:
+    get:
+      consumes:
+      - application/json
+      description: get reorgs
+      operationId: get-reorgs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.ReorgEvent'
+            type: array
+      summary: Get reorgs
+  /reward/{epoch}:
+    get:
+      consumes:
+      - application/json
+      description: get reward by epoch
+      operationId: get-reward-by-epoch
+      parameters:
+      - description: Epoch
+        in: path
+        name: epoch
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dbmodel.BlockReward'
+            type: array
+      summary: Get reward by epoch
+  /strategy:
+    get:
+      consumes:
+      - application/json
+      description: get strategy config
+      operationId: get-strategy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Strategy'
+      summary: Get strategy config
+  /update-strategy:
+    post:
+      consumes:
+      - application/json
+      description: update strategy
+      operationId: update-strategy
+      parameters:
+      - description: Strategy
+        in: body
+        name: strategy
+        required: true
+        schema:
+          $ref: '#/definitions/types.Strategy'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Update strategy
+swagger: "2.0"

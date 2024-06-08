@@ -15,17 +15,16 @@ import (
 
 // AttDelta contains rewards and penalties for a single attestation.
 type AttDelta struct {
-	HeadReward        uint64
-	SourceReward      uint64
-	SourcePenalty     uint64
-	TargetReward      uint64
-	TargetPenalty     uint64
-	InactivityPenalty uint64
+	HeadReward    uint64
+	SourceReward  uint64
+	SourcePenalty uint64
+	TargetReward  uint64
+	TargetPenalty uint64
 }
 
 // InitializePrecomputeValidators precomputes individual validator for its attested balances and the total sum of validators attested balances of the epoch.
 func InitializePrecomputeValidators(ctx context.Context, beaconState state.BeaconState) ([]*precompute.Validator, *precompute.Balance, error) {
-	_, span := trace.StartSpan(ctx, "altair.InitializePrecomputeValidators")
+	ctx, span := trace.StartSpan(ctx, "altair.InitializePrecomputeValidators")
 	defer span.End()
 	vals := make([]*precompute.Validator, beaconState.NumValidators())
 	bal := &precompute.Balance{}
@@ -87,7 +86,7 @@ func ProcessInactivityScores(
 	beaconState state.BeaconState,
 	vals []*precompute.Validator,
 ) (state.BeaconState, []*precompute.Validator, error) {
-	_, span := trace.StartSpan(ctx, "altair.ProcessInactivityScores")
+	ctx, span := trace.StartSpan(ctx, "altair.ProcessInactivityScores")
 	defer span.End()
 
 	cfg := params.BeaconConfig()
@@ -156,7 +155,7 @@ func ProcessEpochParticipation(
 	bal *precompute.Balance,
 	vals []*precompute.Validator,
 ) ([]*precompute.Validator, *precompute.Balance, error) {
-	_, span := trace.StartSpan(ctx, "altair.ProcessEpochParticipation")
+	ctx, span := trace.StartSpan(ctx, "altair.ProcessEpochParticipation")
 	defer span.End()
 
 	cp, err := beaconState.CurrentEpochParticipation()
@@ -252,7 +251,7 @@ func ProcessRewardsAndPenaltiesPrecompute(
 		if err != nil {
 			return nil, err
 		}
-		balances[i] = helpers.DecreaseBalanceWithVal(balances[i], delta.SourcePenalty+delta.TargetPenalty+delta.InactivityPenalty)
+		balances[i] = helpers.DecreaseBalanceWithVal(balances[i], delta.SourcePenalty+delta.TargetPenalty)
 
 		vals[i].AfterEpochTransitionBalance = balances[i]
 	}
@@ -352,7 +351,7 @@ func attestationDelta(
 		if err != nil {
 			return &AttDelta{}, err
 		}
-		attDelta.InactivityPenalty = n / inactivityDenominator
+		attDelta.TargetPenalty += n / inactivityDenominator
 	}
 
 	return attDelta, nil

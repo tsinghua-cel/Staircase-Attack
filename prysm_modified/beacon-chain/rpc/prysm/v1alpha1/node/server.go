@@ -199,7 +199,7 @@ func (ns *Server) ListPeers(ctx context.Context, _ *empty.Empty) (*ethpb.Peers, 
 		if multiaddr != nil {
 			multiAddrStr = multiaddr.String()
 		}
-		address := fmt.Sprintf("%s/p2p/%s", multiAddrStr, pid.String())
+		address := fmt.Sprintf("%s/p2p/%s", multiAddrStr, pid.Pretty())
 		pbDirection := ethpb.PeerDirection_UNKNOWN
 		switch direction {
 		case network.DirInbound:

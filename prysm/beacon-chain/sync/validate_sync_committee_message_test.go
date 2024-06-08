@@ -22,7 +22,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/startup"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
 	mockSync "github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/initial-sync/testing"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/verification"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -176,7 +175,7 @@ func TestService_ValidateSyncCommitteeMessage(t *testing.T) {
 				s.cfg.stateGen = stategen.New(beaconDB, doublylinkedtree.New())
 				s.cfg.beaconDB = beaconDB
 				s.initCaches()
-				s.cfg.chain = &mockChain.ChainService{Genesis: time.Now()}
+				s.cfg.chain = &mockChain.ChainService{}
 				incorrectRoot := [32]byte{0xBB}
 				msg.BlockRoot = incorrectRoot[:]
 
@@ -211,7 +210,6 @@ func TestService_ValidateSyncCommitteeMessage(t *testing.T) {
 				assert.NoError(t, err)
 				s.cfg.chain = &mockChain.ChainService{
 					SyncCommitteeIndices: []primitives.CommitteeIndex{0},
-					Genesis:              time.Now(),
 				}
 				numOfVals := hState.NumValidators()
 
@@ -256,9 +254,7 @@ func TestService_ValidateSyncCommitteeMessage(t *testing.T) {
 				msg.BlockRoot = headRoot[:]
 				hState, err := beaconDB.State(context.Background(), headRoot)
 				assert.NoError(t, err)
-				s.cfg.chain = &mockChain.ChainService{
-					Genesis: time.Now(),
-				}
+				s.cfg.chain = &mockChain.ChainService{}
 
 				numOfVals := hState.NumValidators()
 
@@ -318,7 +314,6 @@ func TestService_ValidateSyncCommitteeMessage(t *testing.T) {
 					SyncCommitteeIndices: []primitives.CommitteeIndex{primitives.CommitteeIndex(subCommitteeSize)},
 					SyncCommitteeDomain:  d,
 					PublicKey:            bytesutil.ToBytes48(keys[chosenVal].PublicKey().Marshal()),
-					Genesis:              time.Now(),
 				}
 
 				// Set Topic and Subnet
@@ -371,7 +366,6 @@ func TestService_ValidateSyncCommitteeMessage(t *testing.T) {
 					SyncCommitteeIndices: []primitives.CommitteeIndex{primitives.CommitteeIndex(subCommitteeSize)},
 					SyncCommitteeDomain:  d,
 					PublicKey:            bytesutil.ToBytes48(keys[chosenVal].PublicKey().Marshal()),
-					Genesis:              time.Now(),
 				}
 
 				msg.Signature = keys[chosenVal].Sign(sigRoot[:]).Marshal()
@@ -407,13 +401,12 @@ func TestService_ValidateSyncCommitteeMessage(t *testing.T) {
 			defer cancel()
 
 			cw := startup.NewClockSynchronizer()
-			opts := []Option{WithClockWaiter(cw), WithStateNotifier(chainService.StateNotifier())}
+			opts := []Option{WithClockWaiter(cw)}
 			svc := NewService(ctx, append(opts, tt.svcopts...)...)
 			var clock *startup.Clock
 			svc, tt.args.topic, clock = tt.setupSvc(svc, tt.args.msg, tt.args.topic)
 			go svc.Start()
 			require.NoError(t, cw.SetClock(clock))
-			svc.verifierWaiter = verification.NewInitializerWaiter(cw, chainService.ForkChoiceStore, svc.cfg.stateGen)
 
 			marshalledObj, err := tt.args.msg.MarshalSSZ()
 			assert.NoError(t, err)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
@@ -25,11 +25,11 @@ func (c beaconApiValidatorClient) submitSignedContributionAndProof(ctx context.C
 		return errors.New("signed contribution and proof contribution is nil")
 	}
 
-	jsonContributionAndProofs := []shared.SignedContributionAndProof{
+	jsonContributionAndProofs := []apimiddleware.SignedContributionAndProofJson{
 		{
-			Message: &shared.ContributionAndProof{
+			Message: &apimiddleware.ContributionAndProofJson{
 				AggregatorIndex: strconv.FormatUint(uint64(in.Message.AggregatorIndex), 10),
-				Contribution: &shared.SyncCommitteeContribution{
+				Contribution: &apimiddleware.SyncCommitteeContributionJson{
 					Slot:              strconv.FormatUint(uint64(in.Message.Contribution.Slot), 10),
 					BeaconBlockRoot:   hexutil.Encode(in.Message.Contribution.BlockRoot),
 					SubcommitteeIndex: strconv.FormatUint(in.Message.Contribution.SubcommitteeIndex, 10),
@@ -47,11 +47,9 @@ func (c beaconApiValidatorClient) submitSignedContributionAndProof(ctx context.C
 		return errors.Wrap(err, "failed to marshall signed contribution and proof")
 	}
 
-	return c.jsonRestHandler.Post(
-		ctx,
-		"/eth/v1/validator/contribution_and_proofs",
-		nil,
-		bytes.NewBuffer(jsonContributionAndProofsBytes),
-		nil,
-	)
+	if _, err := c.jsonRestHandler.PostRestJson(ctx, "/eth/v1/validator/contribution_and_proofs", nil, bytes.NewBuffer(jsonContributionAndProofsBytes), nil); err != nil {
+		return errors.Wrap(err, "failed to send POST data to REST endpoint")
+	}
+
+	return nil
 }

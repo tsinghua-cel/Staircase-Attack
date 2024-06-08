@@ -73,8 +73,7 @@ func AttestingIndices(bf bitfield.Bitfield, committee []primitives.ValidatorInde
 		return nil, fmt.Errorf("bitfield length %d is not equal to committee length %d", bf.Len(), len(committee))
 	}
 	indices := make([]uint64, 0, bf.Count())
-	p := bf.BitIndices()
-	for _, idx := range p {
+	for _, idx := range bf.BitIndices() {
 		if idx < len(committee) {
 			indices = append(indices, uint64(committee[idx]))
 		}
@@ -102,10 +101,9 @@ func AttestingIndices(bf bitfield.Bitfield, committee []primitives.ValidatorInde
 //	 signing_root = compute_signing_root(indexed_attestation.data, domain)
 //	 return bls.FastAggregateVerify(pubkeys, signing_root, indexed_attestation.signature)
 func VerifyIndexedAttestationSig(ctx context.Context, indexedAtt *ethpb.IndexedAttestation, pubKeys []bls.PublicKey, domain []byte) error {
-	_, span := trace.StartSpan(ctx, "attestationutil.VerifyIndexedAttestationSig")
+	ctx, span := trace.StartSpan(ctx, "attestationutil.VerifyIndexedAttestationSig")
 	defer span.End()
 	indices := indexedAtt.AttestingIndices
-
 	messageHash, err := signing.ComputeSigningRoot(indexedAtt.Data, domain)
 	if err != nil {
 		return errors.Wrap(err, "could not get signing root of object")
@@ -143,7 +141,7 @@ func VerifyIndexedAttestationSig(ctx context.Context, indexedAtt *ethpb.IndexedA
 //	  signing_root = compute_signing_root(indexed_attestation.data, domain)
 //	  return bls.FastAggregateVerify(pubkeys, signing_root, indexed_attestation.signature)
 func IsValidAttestationIndices(ctx context.Context, indexedAttestation *ethpb.IndexedAttestation) error {
-	_, span := trace.StartSpan(ctx, "attestationutil.IsValidAttestationIndices")
+	ctx, span := trace.StartSpan(ctx, "attestationutil.IsValidAttestationIndices")
 	defer span.End()
 
 	if indexedAttestation == nil || indexedAttestation.Data == nil || indexedAttestation.Data.Target == nil || indexedAttestation.AttestingIndices == nil {

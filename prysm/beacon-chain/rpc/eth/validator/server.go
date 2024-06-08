@@ -10,7 +10,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/operations/synccommittee"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/core"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/rewards"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/lookup"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/sync"
 	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -29,12 +28,10 @@ type Server struct {
 	OptimisticModeFetcher  blockchain.OptimisticModeFetcher
 	SyncCommitteePool      synccommittee.Pool
 	V1Alpha1Server         eth.BeaconNodeValidatorServer
+	ProposerSlotIndexCache *cache.ProposerPayloadIDsCache
 	ChainInfoFetcher       blockchain.ChainInfoFetcher
 	BeaconDB               db.HeadAccessDatabase
 	BlockBuilder           builder.BlockBuilder
 	OperationNotifier      operation.Notifier
 	CoreService            *core.Service
-	BlockRewardFetcher     rewards.BlockRewardsFetcher
-	TrackedValidatorsCache *cache.TrackedValidatorsCache
-	PayloadIDCache         *cache.PayloadIDCache
 }

@@ -191,7 +191,7 @@ func TestProcessBlock_IncorrectProcessExits(t *testing.T) {
 	require.NoError(t, beaconState.AppendCurrentEpochAttestations(&ethpb.PendingAttestation{}))
 	wsb, err := consensusblocks.NewSignedBeaconBlock(block)
 	require.NoError(t, err)
-	_, err = transition.VerifyOperationLengths(context.Background(), beaconState, wsb.Block())
+	_, err = transition.VerifyOperationLengths(context.Background(), beaconState, wsb)
 	wanted := "number of voluntary exits (17) in block body exceeds allowed threshold of 16"
 	assert.ErrorContains(t, wanted, err)
 }
@@ -382,18 +382,10 @@ func TestProcessEpochPrecompute_CanProcess(t *testing.T) {
 		FinalizedCheckpoint:        &ethpb.Checkpoint{Root: make([]byte, fieldparams.RootLength)},
 		JustificationBits:          bitfield.Bitvector4{0x00},
 		CurrentJustifiedCheckpoint: &ethpb.Checkpoint{Root: make([]byte, fieldparams.RootLength)},
-		Validators: []*ethpb.Validator{
-			{
-				ExitEpoch:        params.BeaconConfig().FarFutureEpoch,
-				EffectiveBalance: params.BeaconConfig().MinDepositAmount,
-			},
-		},
-		Balances: []uint64{
-			params.BeaconConfig().MinDepositAmount,
-		},
 	}
 	s, err := state_native.InitializeFromProtoPhase0(base)
 	require.NoError(t, err)
+	require.NoError(t, s.SetValidators([]*ethpb.Validator{}))
 	newState, err := transition.ProcessEpochPrecompute(context.Background(), s)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(0), newState.Slashings()[2], "Unexpected slashed balance")
@@ -414,7 +406,7 @@ func TestProcessBlock_OverMaxProposerSlashings(t *testing.T) {
 	require.NoError(t, err)
 	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
 	require.NoError(t, err)
-	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb.Block())
+	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb)
 	assert.ErrorContains(t, want, err)
 }
 
@@ -433,7 +425,7 @@ func TestProcessBlock_OverMaxAttesterSlashings(t *testing.T) {
 	require.NoError(t, err)
 	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
 	require.NoError(t, err)
-	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb.Block())
+	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb)
 	assert.ErrorContains(t, want, err)
 }
 
@@ -451,7 +443,7 @@ func TestProcessBlock_OverMaxAttestations(t *testing.T) {
 	require.NoError(t, err)
 	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
 	require.NoError(t, err)
-	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb.Block())
+	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb)
 	assert.ErrorContains(t, want, err)
 }
 
@@ -470,7 +462,7 @@ func TestProcessBlock_OverMaxVoluntaryExits(t *testing.T) {
 	require.NoError(t, err)
 	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
 	require.NoError(t, err)
-	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb.Block())
+	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb)
 	assert.ErrorContains(t, want, err)
 }
 
@@ -492,7 +484,7 @@ func TestProcessBlock_IncorrectDeposits(t *testing.T) {
 		s.Eth1Data().DepositCount-s.Eth1DepositIndex(), len(b.Block.Body.Deposits))
 	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
 	require.NoError(t, err)
-	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb.Block())
+	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb)
 	assert.ErrorContains(t, want, err)
 }
 

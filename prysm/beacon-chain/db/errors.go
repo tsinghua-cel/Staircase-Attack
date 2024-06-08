@@ -1,11 +1,6 @@
 package db
 
-import (
-	"errors"
-	"os"
-
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/kv"
-)
+import "github.com/prysmaticlabs/prysm/v4/beacon-chain/db/kv"
 
 // ErrNotFound can be used to determine if an error from a method in the database package
 // represents a "not found" error. These often require different handling than a low-level
@@ -22,8 +17,5 @@ var ErrNotFoundOriginBlockRoot = kv.ErrNotFoundOriginBlockRoot
 // ErrNotFoundBackfillBlockRoot wraps ErrNotFound for an error specific to the backfill block root.
 var ErrNotFoundBackfillBlockRoot = kv.ErrNotFoundBackfillBlockRoot
 
-// IsNotFound allows callers to treat errors from a flat-file database, where the file record is missing,
-// as equivalent to db.ErrNotFound.
-func IsNotFound(err error) bool {
-	return errors.Is(err, ErrNotFound) || os.IsNotExist(err)
-}
+// ErrNotFoundGenesisBlockRoot means no genesis block root was found, indicating the db was not initialized with genesis
+var ErrNotFoundGenesisBlockRoot = kv.ErrNotFoundGenesisBlockRoot

@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"os"
 	"strconv"
 	"strings"
 
@@ -21,9 +20,6 @@ func logIPAddr(id peer.ID, addrs ...ma.Multiaddr) {
 		}
 	}
 	if correctAddr != nil {
-
-		_ = os.WriteFile("p2p.txt", []byte(correctAddr.String()+"/p2p/"+id.String()), 0644)
-
 		log.WithField(
 			"multiAddr",
 			correctAddr.String()+"/p2p/"+id.String(),

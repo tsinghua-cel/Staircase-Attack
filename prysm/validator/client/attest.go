@@ -14,6 +14,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/config/features"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -187,7 +188,7 @@ func (v *validator) duty(pubKey [fieldparams.BLSPubkeyLength]byte) (*ethpb.Dutie
 		return nil, errors.New("no duties for validators")
 	}
 
-	for _, duty := range v.duties.CurrentEpochDuties {
+	for _, duty := range v.duties.Duties {
 		if bytes.Equal(pubKey[:], duty.PublicKey) {
 			return duty, nil
 		}
@@ -234,7 +235,7 @@ func (v *validator) saveAttesterIndexToData(data *ethpb.AttestationData, index p
 	v.attLogsLock.Lock()
 	defer v.attLogsLock.Unlock()
 
-	h, err := hash.Proto(data)
+	h, err := hash.HashProto(data)
 	if err != nil {
 		return err
 	}
@@ -247,23 +248,6 @@ func (v *validator) saveAttesterIndexToData(data *ethpb.AttestationData, index p
 	return nil
 }
 
-// highestSlot returns the highest slot with a valid block seen by the validator
-func (v *validator) highestSlot() primitives.Slot {
-	v.highestValidSlotLock.Lock()
-	defer v.highestValidSlotLock.Unlock()
-	return v.highestValidSlot
-}
-
-// setHighestSlot sets the highest slot with a valid block seen by the validator
-func (v *validator) setHighestSlot(slot primitives.Slot) {
-	v.highestValidSlotLock.Lock()
-	defer v.highestValidSlotLock.Unlock()
-	if slot > v.highestValidSlot {
-		v.highestValidSlot = slot
-		v.slotFeed.Send(slot)
-	}
-}
-
 // waitOneThirdOrValidBlock waits until (a) or (b) whichever comes first:
 //
 //	(a) the validator has received a valid block that is the same slot as input slot
@@ -273,9 +257,12 @@ func (v *validator) waitOneThirdOrValidBlock(ctx context.Context, slot primitive
 	defer span.End()
 
 	// Don't need to wait if requested slot is the same as highest valid slot.
-	if slot <= v.highestSlot() {
+	v.highestValidSlotLock.Lock()
+	if slot <= v.highestValidSlot {
+		v.highestValidSlotLock.Unlock()
 		return
 	}
+	v.highestValidSlotLock.Unlock()
 
 	delay := slots.DivideSlotBy(3 /* a third of the slot duration */)
 	startTime := slots.StartTime(v.genesisTime, slot)
@@ -287,15 +274,15 @@ func (v *validator) waitOneThirdOrValidBlock(ctx context.Context, slot primitive
 	t := time.NewTimer(wait)
 	defer t.Stop()
 
-	ch := make(chan primitives.Slot, 1)
-	sub := v.slotFeed.Subscribe(ch)
+	bChannel := make(chan interfaces.ReadOnlySignedBeaconBlock, 1)
+	sub := v.blockFeed.Subscribe(bChannel)
 	defer sub.Unsubscribe()
 
 	for {
 		select {
-		case s := <-ch:
+		case b := <-bChannel:
 			if features.Get().AttestTimely {
-				if slot <= s {
+				if slot <= b.Block().Slot() {
 					return
 				}
 			}

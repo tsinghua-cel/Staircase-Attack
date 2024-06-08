@@ -22,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache/depositsnapshot"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
@@ -128,7 +129,6 @@ type config struct {
 	currHttpEndpoint        network.Endpoint
 	headers                 []string
 	finalizedStateAtStartup state.BeaconState
-	jwtId                   string
 }
 
 // Service fetches important information about the canonical
@@ -208,9 +208,13 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 		}
 	}
 
-	eth1Data, err := s.validPowchainData(ctx)
-	if err != nil {
+	if err := s.ensureValidPowchainData(ctx); err != nil {
 		return nil, errors.Wrap(err, "unable to validate powchain data")
+	}
+
+	eth1Data, err := s.cfg.beaconDB.ExecutionChainData(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to retrieve eth1 data")
 	}
 	if err := s.initializeEth1Data(ctx, eth1Data); err != nil {
 		return nil, err
@@ -241,6 +245,9 @@ func (s *Service) Start() {
 
 	// Poll the execution client connection and fallback if errors occur.
 	s.pollConnectionStatus(s.ctx)
+
+	// Check transition configuration for the engine API client in the background.
+	go s.checkTransitionConfiguration(s.ctx, make(chan *feed.Event, 1))
 
 	go s.run(s.ctx.Done())
 }
@@ -751,10 +758,6 @@ func (s *Service) initializeEth1Data(ctx context.Context, eth1DataInDB *ethpb.ET
 			}
 		}
 	} else {
-		if eth1DataInDB.Trie == nil && eth1DataInDB.DepositSnapshot != nil {
-			return errors.Errorf("trying to use old deposit trie after migration to the new trie. "+
-				"Run with the --%s flag to resume normal operations.", features.EnableEIP4881.Name)
-		}
 		s.depositTrie, err = trie.CreateTrieFromProto(eth1DataInDB.Trie)
 	}
 	if err != nil {
@@ -819,22 +822,23 @@ func validateDepositContainers(ctrs []*ethpb.DepositContainer) bool {
 
 // Validates the current powchain data is saved and makes sure that any
 // embedded genesis state is correctly accounted for.
-func (s *Service) validPowchainData(ctx context.Context) (*ethpb.ETH1ChainData, error) {
+func (s *Service) ensureValidPowchainData(ctx context.Context) error {
 	genState, err := s.cfg.beaconDB.GenesisState(ctx)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	// Exit early if no genesis state is saved.
+	if genState == nil || genState.IsNil() {
+		return nil
 	}
 	eth1Data, err := s.cfg.beaconDB.ExecutionChainData(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to retrieve eth1 data")
-	}
-	if genState == nil || genState.IsNil() {
-		return eth1Data, nil
+		return errors.Wrap(err, "unable to retrieve eth1 data")
 	}
 	if eth1Data == nil || !eth1Data.ChainstartData.Chainstarted || !validateDepositContainers(eth1Data.DepositContainers) {
 		pbState, err := native.ProtobufBeaconStatePhase0(s.preGenesisState.ToProtoUnsafe())
 		if err != nil {
-			return nil, err
+			return err
 		}
 		s.chainStartData = &ethpb.ChainStartData{
 			Chainstarted:       true,
@@ -852,24 +856,22 @@ func (s *Service) validPowchainData(ctx context.Context) (*ethpb.ETH1ChainData, 
 		if features.Get().EnableEIP4881 {
 			trie, ok := s.depositTrie.(*depositsnapshot.DepositTree)
 			if !ok {
-				return nil, errors.New("deposit trie was not EIP4881 DepositTree")
+				return errors.New("deposit trie was not EIP4881 DepositTree")
 			}
 			eth1Data.DepositSnapshot, err = trie.ToProto()
 			if err != nil {
-				return nil, err
+				return err
 			}
 		} else {
 			trie, ok := s.depositTrie.(*trie.SparseMerkleTrie)
 			if !ok {
-				return nil, errors.New("deposit trie was not SparseMerkleTrie")
+				return errors.New("deposit trie was not SparseMerkleTrie")
 			}
 			eth1Data.Trie = trie.ToProto()
 		}
-		if err := s.cfg.beaconDB.SaveExecutionChainData(ctx, eth1Data); err != nil {
-			return nil, err
-		}
+		return s.cfg.beaconDB.SaveExecutionChainData(ctx, eth1Data)
 	}
-	return eth1Data, nil
+	return nil
 }
 
 func dedupEndpoints(endpoints []string) []string {

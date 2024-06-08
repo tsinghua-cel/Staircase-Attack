@@ -80,15 +80,15 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumbe
 			return nil, nil
 		}
 		num = *number
-	case rpc.FinalizedBlockNumber:
-		hash = rawdb.ReadFinalizedBlockHash(b.db)
-		number := rawdb.ReadHeaderNumber(b.db, hash)
-		if number == nil {
-			return nil, nil
-		}
-		num = *number
-	case rpc.SafeBlockNumber:
-		return nil, errors.New("safe block not found")
+	//case rpc.FinalizedBlockNumber:
+	//	hash = rawdb.ReadFinalizedBlockHash(b.db)
+	//	number := rawdb.ReadHeaderNumber(b.db, hash)
+	//	if number == nil {
+	//		return nil, nil
+	//	}
+	//	num = *number
+	//case rpc.SafeBlockNumber:
+	//	return nil, errors.New("safe block not found")
 	default:
 		num = uint64(blockNr)
 		hash = rawdb.ReadCanonicalHash(b.db, num)
@@ -820,7 +820,7 @@ func TestLightFilterLogs(t *testing.T) {
 		key, _  = crypto.GenerateKey()
 		addr    = crypto.PubkeyToAddress(key.PublicKey)
 		genesis = &core.Genesis{Config: params.TestChainConfig,
-			Alloc: core.GenesisAlloc{
+			Alloc: types.GenesisAlloc{
 				addr: {Balance: big.NewInt(params.Ether)},
 			},
 		}

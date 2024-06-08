@@ -332,8 +332,9 @@ func (s *State) CombinedCache() *CombinedCache {
 }
 
 func (s *State) slotAvailable(slot primitives.Slot) bool {
-	if s.avb == nil {
+	// default to assuming node was initialized from genesis - backfill only needs to be specified for checkpoint sync
+	if s.backfillStatus == nil {
 		return true
 	}
-	return s.avb.AvailableBlock(slot)
+	return s.backfillStatus.SlotCovered(slot)
 }

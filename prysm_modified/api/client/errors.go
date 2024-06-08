@@ -32,7 +32,7 @@ func Non200Err(response *http.Response) error {
 	}
 	msg := fmt.Sprintf("code=%d, url=%s, body=%s", response.StatusCode, response.Request.URL, body)
 	switch response.StatusCode {
-	case http.StatusNotFound:
+	case 404:
 		return errors.Wrap(ErrNotFound, msg)
 	default:
 		return errors.Wrap(ErrNotOK, msg)

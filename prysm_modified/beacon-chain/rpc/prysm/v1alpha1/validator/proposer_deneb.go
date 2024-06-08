@@ -1,93 +1,97 @@
 package validator
 
 import (
-	"errors"
-	"sync"
-
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
-var bundleCache = &blobsBundleCache{}
-
-// BlobsBundleCache holds the KZG commitments and other relevant sidecar data for a local beacon block.
-type blobsBundleCache struct {
-	sync.Mutex
-	slot   primitives.Slot
-	bundle *enginev1.BlobsBundle
-}
-
-// add adds a blobs bundle to the cache.
-// same slot overwrites the previous bundle.
-func (c *blobsBundleCache) add(slot primitives.Slot, bundle *enginev1.BlobsBundle) {
-	c.Lock()
-	defer c.Unlock()
-
-	if slot >= c.slot {
-		c.bundle = bundle
-		c.slot = slot
-	}
-}
-
-// get gets a blobs bundle from the cache.
-func (c *blobsBundleCache) get(slot primitives.Slot) *enginev1.BlobsBundle {
-	c.Lock()
-	defer c.Unlock()
-
-	if c.slot == slot {
-		return c.bundle
-	}
-
-	return nil
-}
-
-// prune acquires the lock before pruning.
-func (c *blobsBundleCache) prune(minSlot primitives.Slot) {
-	c.Lock()
-	defer c.Unlock()
-
-	if minSlot > c.slot {
-		c.slot = 0
-		c.bundle = nil
-	}
-}
-
-// buildBlobSidecars given a block, builds the blob sidecars for the block.
-func buildBlobSidecars(blk interfaces.SignedBeaconBlock, blobs [][]byte, kzgProofs [][]byte) ([]*ethpb.BlobSidecar, error) {
+// setKzgCommitments sets the KZG commitment on the block.
+// Return early if the block version is older than deneb or block slot has not passed deneb epoch.
+// Depends on the blk is blind or not, set the KZG commitment from the corresponding bundle.
+func setKzgCommitments(blk interfaces.SignedBeaconBlock, bundle *enginev1.BlobsBundle, blindBundle *enginev1.BlindedBlobsBundle) error {
 	if blk.Version() < version.Deneb {
-		return nil, nil // No blobs before deneb.
+		return nil
 	}
-	denebBlk, err := blk.PbDenebBlock()
+	slot := blk.Block().Slot()
+	if slots.ToEpoch(slot) < params.BeaconConfig().DenebForkEpoch {
+		return nil
+	}
+
+	if blk.IsBlinded() {
+		if blindBundle == nil {
+			return nil
+		}
+		return blk.SetBlobKzgCommitments(blindBundle.KzgCommitments)
+	}
+
+	if bundle == nil {
+		return nil
+	}
+	return blk.SetBlobKzgCommitments(bundle.KzgCommitments)
+}
+
+// coverts a blobs bundle to a sidecar format.
+func blobsBundleToSidecars(bundle *enginev1.BlobsBundle, blk interfaces.ReadOnlyBeaconBlock) ([]*ethpb.BlobSidecar, error) {
+	if blk.Version() < version.Deneb {
+		return nil, nil
+	}
+	if bundle == nil || len(bundle.KzgCommitments) == 0 {
+		return nil, nil
+	}
+	r, err := blk.HashTreeRoot()
 	if err != nil {
 		return nil, err
 	}
-	cLen := len(denebBlk.Block.Body.BlobKzgCommitments)
-	if cLen != len(blobs) || cLen != len(kzgProofs) {
-		return nil, errors.New("blob KZG commitments don't match number of blobs or KZG proofs")
+	pr := blk.ParentRoot()
+
+	sidecars := make([]*ethpb.BlobSidecar, len(bundle.Blobs))
+	for i := 0; i < len(bundle.Blobs); i++ {
+		sidecars[i] = &ethpb.BlobSidecar{
+			BlockRoot:       r[:],
+			Index:           uint64(i),
+			Slot:            blk.Slot(),
+			BlockParentRoot: pr[:],
+			ProposerIndex:   blk.ProposerIndex(),
+			Blob:            bundle.Blobs[i],
+			KzgCommitment:   bundle.KzgCommitments[i],
+			KzgProof:        bundle.Proofs[i],
+		}
 	}
-	blobSidecars := make([]*ethpb.BlobSidecar, cLen)
-	header, err := blk.Header()
+
+	return sidecars, nil
+}
+
+// coverts a blinds blobs bundle to a sidecar format.
+func blindBlobsBundleToSidecars(bundle *enginev1.BlindedBlobsBundle, blk interfaces.ReadOnlyBeaconBlock) ([]*ethpb.BlindedBlobSidecar, error) {
+	if blk.Version() < version.Deneb {
+		return nil, nil
+	}
+	if bundle == nil || len(bundle.KzgCommitments) == 0 {
+		return nil, nil
+	}
+	r, err := blk.HashTreeRoot()
 	if err != nil {
 		return nil, err
 	}
-	body := blk.Block().Body()
-	for i := range blobSidecars {
-		proof, err := blocks.MerkleProofKZGCommitment(body, i)
-		if err != nil {
-			return nil, err
-		}
-		blobSidecars[i] = &ethpb.BlobSidecar{
-			Index:                    uint64(i),
-			Blob:                     blobs[i],
-			KzgCommitment:            denebBlk.Block.Body.BlobKzgCommitments[i],
-			KzgProof:                 kzgProofs[i],
-			SignedBlockHeader:        header,
-			CommitmentInclusionProof: proof,
+	pr := blk.ParentRoot()
+
+	sidecars := make([]*ethpb.BlindedBlobSidecar, len(bundle.BlobRoots))
+	for i := 0; i < len(bundle.BlobRoots); i++ {
+		sidecars[i] = &ethpb.BlindedBlobSidecar{
+			BlockRoot:       r[:],
+			Index:           uint64(i),
+			Slot:            blk.Slot(),
+			BlockParentRoot: pr[:],
+			ProposerIndex:   blk.ProposerIndex(),
+			BlobRoot:        bundle.BlobRoots[i],
+			KzgCommitment:   bundle.KzgCommitments[i],
+			KzgProof:        bundle.Proofs[i],
 		}
 	}
-	return blobSidecars, nil
+
+	return sidecars, nil
 }

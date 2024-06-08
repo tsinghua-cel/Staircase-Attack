@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/shared"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/validator"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -31,9 +31,9 @@ func TestSubscribeCommitteeSubnets_Valid(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	jsonCommitteeSubscriptions := make([]*shared.BeaconCommitteeSubscription, len(subscribeSlots))
+	jsonCommitteeSubscriptions := make([]*apimiddleware.BeaconCommitteeSubscribeJson, len(subscribeSlots))
 	for index := range jsonCommitteeSubscriptions {
-		jsonCommitteeSubscriptions[index] = &shared.BeaconCommitteeSubscription{
+		jsonCommitteeSubscriptions[index] = &apimiddleware.BeaconCommitteeSubscribeJson{
 			ValidatorIndex:   strconv.FormatUint(uint64(validatorIndices[index]), 10),
 			CommitteeIndex:   strconv.FormatUint(uint64(committeeIndices[index]), 10),
 			CommitteesAtSlot: strconv.FormatUint(committeesAtSlot[index], 10),
@@ -47,14 +47,15 @@ func TestSubscribeCommitteeSubnets_Valid(t *testing.T) {
 
 	ctx := context.Background()
 
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-	jsonRestHandler.EXPECT().Post(
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+	jsonRestHandler.EXPECT().PostRestJson(
 		ctx,
 		subscribeCommitteeSubnetsTestEndpoint,
 		nil,
 		bytes.NewBuffer(committeeSubscriptionsBytes),
 		nil,
 	).Return(
+		nil,
 		nil,
 	).Times(1)
 
@@ -247,7 +248,7 @@ func TestSubscribeCommitteeSubnets_Error(t *testing.T) {
 			},
 			expectGetDutiesQuery:    true,
 			expectSubscribeRestCall: true,
-			expectedErrorMessage:    "foo error",
+			expectedErrorMessage:    "failed to send POST data to REST endpoint: foo error",
 		},
 	}
 
@@ -270,15 +271,16 @@ func TestSubscribeCommitteeSubnets_Error(t *testing.T) {
 				).Times(1)
 			}
 
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 			if testCase.expectSubscribeRestCall {
-				jsonRestHandler.EXPECT().Post(
+				jsonRestHandler.EXPECT().PostRestJson(
 					ctx,
 					subscribeCommitteeSubnetsTestEndpoint,
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 				).Return(
+					nil,
 					errors.New("foo error"),
 				).Times(1)
 			}

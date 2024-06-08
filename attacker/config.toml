@@ -1,0 +1,16 @@
+http_port=10000
+http_host="0.0.0.0"
+metrics_port = 28080
+execute_rpc = "http://127.0.0.1:8545"
+beacon_rpc = "172.17.0.1:33500"
+reward_file = "/root/reward.csv"
+strategy = "/root/strategy.json"
+swag_host = "127.0.0.1"
+
+[mysql]
+host="ethmysql"
+port=3306
+user="eth"
+password="12345678"
+database="eth"
+

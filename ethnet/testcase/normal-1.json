@@ -1,0 +1,25 @@
+{
+    "version": "v1",
+    "config": {
+        "total-time": 1800
+    },
+    "topology": {
+        "executors": [{
+                "name": "execute-1",
+                "version": "v1.13-base-v4"
+            }
+        ],
+        "beacons": [{
+                "name": "beacon-1",
+                "version": "v4.1.1-base",
+                "executor": "execute-1"
+            }
+        ],
+        "validators": [{
+                "name": "validator-1",
+                "version": "v4.1.1-base",
+                "beacon": "beacon-1"
+            }
+        ]
+    }
+}

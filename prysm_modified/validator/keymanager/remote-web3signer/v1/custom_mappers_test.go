@@ -45,7 +45,7 @@ func TestMapAggregateAndProof(t *testing.T) {
 			},
 			want: &v1.AggregateAndProof{
 				AggregatorIndex: "0",
-				Aggregate:       mock.Attestation(),
+				Aggregate:       mock.MockAttestation(),
 				SelectionProof:  make([]byte, fieldparams.BLSSignatureLength),
 			},
 			wantErr: false,
@@ -92,7 +92,7 @@ func TestMapAttestation(t *testing.T) {
 					Signature: make([]byte, 96),
 				},
 			},
-			want:    mock.Attestation(),
+			want:    mock.MockAttestation(),
 			wantErr: false,
 		},
 	}
@@ -133,7 +133,7 @@ func TestMapAttestationData(t *testing.T) {
 					},
 				},
 			},
-			want:    mock.Attestation().Data,
+			want:    mock.MockAttestation().Data,
 			wantErr: false,
 		},
 	}
@@ -194,8 +194,8 @@ func TestMapAttesterSlashing(t *testing.T) {
 				},
 			},
 			want: &v1.AttesterSlashing{
-				Attestation1: mock.IndexedAttestation(),
-				Attestation2: mock.IndexedAttestation(),
+				Attestation1: mock.MockIndexedAttestation(),
+				Attestation2: mock.MockIndexedAttestation(),
 			},
 			wantErr: false,
 		},
@@ -331,12 +331,12 @@ func TestMapBeaconBlockAltair(t *testing.T) {
 						},
 						SyncAggregate: &ethpb.SyncAggregate{
 							SyncCommitteeSignature: make([]byte, fieldparams.BLSSignatureLength),
-							SyncCommitteeBits:      mock.SyncComitteeBits(),
+							SyncCommitteeBits:      mock.MockSyncComitteeBits(),
 						},
 					},
 				},
 			},
-			want:    mock.BeaconBlockAltair(),
+			want:    mock.MockBeaconBlockAltair(),
 			wantErr: false,
 		},
 	}
@@ -466,7 +466,7 @@ func TestMapBeaconBlockBody(t *testing.T) {
 					},
 				},
 			},
-			want:    mock.BeaconBlockBody(),
+			want:    mock.MockBeaconBlockBody(),
 			wantErr: false,
 		},
 	}
@@ -503,13 +503,13 @@ func TestMapContributionAndProof(t *testing.T) {
 						Slot:              0,
 						BlockRoot:         make([]byte, fieldparams.RootLength),
 						SubcommitteeIndex: 0,
-						AggregationBits:   mock.AggregationBits(),
+						AggregationBits:   mock.MockAggregationBits(),
 						Signature:         make([]byte, fieldparams.BLSSignatureLength),
 					},
 					SelectionProof: make([]byte, fieldparams.BLSSignatureLength),
 				},
 			},
-			want: mock.ContributionAndProof(),
+			want: mock.MockContributionAndProof(),
 		},
 	}
 	for _, tt := range tests {
@@ -544,7 +544,7 @@ func TestMapForkInfo(t *testing.T) {
 				slot:                  0,
 				genesisValidatorsRoot: make([]byte, fieldparams.RootLength),
 			},
-			want:    mock.ForkInfo(),
+			want:    mock.MockForkInfo(),
 			wantErr: false,
 		},
 	}

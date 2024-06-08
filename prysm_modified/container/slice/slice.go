@@ -1,7 +1,6 @@
 package slice
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
@@ -391,13 +390,4 @@ func Reverse[E any](s []E) []E {
 		s[i], s[j] = s[j], s[i]
 	}
 	return s
-}
-
-// VerifyMaxLength takes a slice and a maximum length and validates the length.
-func VerifyMaxLength[T any](v []T, max int) error {
-	l := len(v)
-	if l > max {
-		return fmt.Errorf("length of %d exceeds max of %d", l, max)
-	}
-	return nil
 }

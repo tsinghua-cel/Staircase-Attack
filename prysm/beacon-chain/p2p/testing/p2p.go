@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,7 +41,7 @@ type TestP2P struct {
 	BHost           host.Host
 	pubsub          *pubsub.PubSub
 	joinedTopics    map[string]*pubsub.Topic
-	BroadcastCalled atomic.Bool
+	BroadcastCalled bool
 	DelaySend       bool
 	Digest          [4]byte
 	peers           *peers.Status
@@ -52,7 +51,7 @@ type TestP2P struct {
 // NewTestP2P initializes a new p2p test service.
 func NewTestP2P(t *testing.T) *TestP2P {
 	ctx := context.Background()
-	h := bhost.NewBlankHost(swarmt.GenSwarm(t, swarmt.OptDisableQUIC))
+	h := bhost.NewBlankHost(swarmt.GenSwarm(t))
 	ps, err := pubsub.NewFloodSub(ctx, h,
 		pubsub.WithMessageSigning(false),
 		pubsub.WithStrictSignatureVerification(false),
@@ -161,25 +160,25 @@ func (p *TestP2P) ReceivePubSub(topic string, msg proto.Message) {
 
 // Broadcast a message.
 func (p *TestP2P) Broadcast(_ context.Context, _ proto.Message) error {
-	p.BroadcastCalled.Store(true)
+	p.BroadcastCalled = true
 	return nil
 }
 
 // BroadcastAttestation broadcasts an attestation.
 func (p *TestP2P) BroadcastAttestation(_ context.Context, _ uint64, _ *ethpb.Attestation) error {
-	p.BroadcastCalled.Store(true)
+	p.BroadcastCalled = true
 	return nil
 }
 
 // BroadcastSyncCommitteeMessage broadcasts a sync committee message.
 func (p *TestP2P) BroadcastSyncCommitteeMessage(_ context.Context, _ uint64, _ *ethpb.SyncCommitteeMessage) error {
-	p.BroadcastCalled.Store(true)
+	p.BroadcastCalled = true
 	return nil
 }
 
 // BroadcastBlob broadcasts a blob for mock.
-func (p *TestP2P) BroadcastBlob(context.Context, uint64, *ethpb.BlobSidecar) error {
-	p.BroadcastCalled.Store(true)
+func (p *TestP2P) BroadcastBlob(context.Context, uint64, *ethpb.SignedBlobSidecar) error {
+	p.BroadcastCalled = true
 	return nil
 }
 

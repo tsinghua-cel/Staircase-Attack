@@ -2,12 +2,14 @@ package slashings
 
 import (
 	"testing"
+
+	"github.com/prysmaticlabs/prysm/v4/config/params"
 )
 
 func TestSigningRootsDiffer(t *testing.T) {
 	type args struct {
-		existingSigningRoot []byte
-		incomingSigningRoot []byte
+		existingSigningRoot [32]byte
+		incomingSigningRoot [32]byte
 	}
 	tests := []struct {
 		name string
@@ -15,50 +17,34 @@ func TestSigningRootsDiffer(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "nil existing signing root is slashable",
+			name: "Empty existing signing root is slashable",
 			args: args{
-				existingSigningRoot: nil,
-				incomingSigningRoot: []byte{1},
-			},
-			want: true,
-		},
-		{
-			name: "empty existing signing root is slashable",
-			args: args{
-				existingSigningRoot: []byte{},
-				incomingSigningRoot: []byte{1},
+				existingSigningRoot: params.BeaconConfig().ZeroHash,
+				incomingSigningRoot: [32]byte{1},
 			},
 			want: true,
 		},
 		{
 			name: "Non-empty, different existing signing root is slashable",
 			args: args{
-				existingSigningRoot: []byte{2},
-				incomingSigningRoot: []byte{1},
+				existingSigningRoot: [32]byte{2},
+				incomingSigningRoot: [32]byte{1},
 			},
 			want: true,
 		},
 		{
 			name: "Non-empty, same existing signing root and incoming signing root is not slashable",
 			args: args{
-				existingSigningRoot: []byte{2},
-				incomingSigningRoot: []byte{2},
+				existingSigningRoot: [32]byte{2},
+				incomingSigningRoot: [32]byte{2},
 			},
 			want: false,
 		},
 		{
-			name: "Both nil are considered slashable",
-			args: args{
-				existingSigningRoot: nil,
-				incomingSigningRoot: nil,
-			},
-			want: true,
-		},
-		{
 			name: "Both empty are considered slashable",
 			args: args{
-				existingSigningRoot: []byte{},
-				incomingSigningRoot: []byte{},
+				existingSigningRoot: params.BeaconConfig().ZeroHash,
+				incomingSigningRoot: params.BeaconConfig().ZeroHash,
 			},
 			want: true,
 		},

@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/mock/gomock"
+	"github.com/prysmaticlabs/prysm/v4/api/gateway/apimiddleware"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/beacon"
-	"github.com/prysmaticlabs/prysm/v4/network/httputil"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	"github.com/prysmaticlabs/prysm/v4/validator/client/beacon-api/mock"
@@ -22,12 +22,13 @@ func TestWaitForChainStart_ValidGenesis(t *testing.T) {
 
 	ctx := context.Background()
 	genesisResponseJson := beacon.GetGenesisResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-	jsonRestHandler.EXPECT().Get(
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
 		"/eth/v1/beacon/genesis",
 		&genesisResponseJson,
 	).Return(
+		nil,
 		nil,
 	).SetArg(
 		2,
@@ -89,12 +90,13 @@ func TestWaitForChainStart_BadGenesis(t *testing.T) {
 
 			ctx := context.Background()
 			genesisResponseJson := beacon.GetGenesisResponse{}
-			jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-			jsonRestHandler.EXPECT().Get(
+			jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+			jsonRestHandler.EXPECT().GetRestJsonResponse(
 				ctx,
 				"/eth/v1/beacon/genesis",
 				&genesisResponseJson,
 			).Return(
+				nil,
 				nil,
 			).SetArg(
 				2,
@@ -117,12 +119,13 @@ func TestWaitForChainStart_JsonResponseError(t *testing.T) {
 
 	ctx := context.Background()
 	genesisResponseJson := beacon.GetGenesisResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
-	jsonRestHandler.EXPECT().Get(
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
 		"/eth/v1/beacon/genesis",
 		&genesisResponseJson,
 	).Return(
+		nil,
 		errors.New("some specific json error"),
 	).Times(1)
 
@@ -140,26 +143,28 @@ func TestWaitForChainStart_JsonResponseError404(t *testing.T) {
 
 	ctx := context.Background()
 	genesisResponseJson := beacon.GetGenesisResponse{}
-	jsonRestHandler := mock.NewMockJsonRestHandler(ctrl)
+	jsonRestHandler := mock.NewMockjsonRestHandler(ctrl)
 
 	// First, mock a request that receives a 404 error (which means that the genesis data is not available yet)
-	jsonRestHandler.EXPECT().Get(
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
 		"/eth/v1/beacon/genesis",
 		&genesisResponseJson,
 	).Return(
-		&httputil.DefaultJsonError{
+		&apimiddleware.DefaultErrorJson{
 			Code:    http.StatusNotFound,
 			Message: "404 error",
 		},
+		errors.New("404 error"),
 	).Times(1)
 
 	// After receiving a 404 error, mock a request that actually has genesis data available
-	jsonRestHandler.EXPECT().Get(
+	jsonRestHandler.EXPECT().GetRestJsonResponse(
 		ctx,
 		"/eth/v1/beacon/genesis",
 		&genesisResponseJson,
 	).Return(
+		nil,
 		nil,
 	).SetArg(
 		2,

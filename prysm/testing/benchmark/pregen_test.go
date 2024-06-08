@@ -12,11 +12,11 @@ func TestPreGenFullBlock(t *testing.T) {
 }
 
 func TestPreGenState1Epoch(t *testing.T) {
-	_, err := PreGenState1Epoch()
+	_, err := PreGenFullBlock()
 	require.NoError(t, err)
 }
 
 func TestPreGenstateFullEpochs(t *testing.T) {
-	_, err := PreGenstateFullEpochs()
+	_, err := PreGenFullBlock()
 	require.NoError(t, err)
 }

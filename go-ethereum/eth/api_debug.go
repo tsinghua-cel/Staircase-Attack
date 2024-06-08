@@ -66,10 +66,10 @@ func (api *DebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error) {
 	switch blockNr {
 	case rpc.LatestBlockNumber:
 		header = api.eth.blockchain.CurrentBlock()
-	case rpc.FinalizedBlockNumber:
-		header = api.eth.blockchain.CurrentFinalBlock()
-	case rpc.SafeBlockNumber:
-		header = api.eth.blockchain.CurrentSafeBlock()
+	//case rpc.FinalizedBlockNumber:
+	//	header = api.eth.blockchain.CurrentFinalBlock()
+	//case rpc.SafeBlockNumber:
+	//	header = api.eth.blockchain.CurrentSafeBlock()
 	default:
 		block := api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 		if block == nil {
@@ -151,10 +151,10 @@ func (api *DebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, start hex
 			switch number {
 			case rpc.LatestBlockNumber:
 				header = api.eth.blockchain.CurrentBlock()
-			case rpc.FinalizedBlockNumber:
-				header = api.eth.blockchain.CurrentFinalBlock()
-			case rpc.SafeBlockNumber:
-				header = api.eth.blockchain.CurrentSafeBlock()
+			//case rpc.FinalizedBlockNumber:
+			//	header = api.eth.blockchain.CurrentFinalBlock()
+			//case rpc.SafeBlockNumber:
+			//	header = api.eth.blockchain.CurrentSafeBlock()
 			default:
 				block := api.eth.blockchain.GetBlockByNumber(uint64(number))
 				if block == nil {

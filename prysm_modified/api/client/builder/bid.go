@@ -6,6 +6,7 @@ import (
 	consensus_types "github.com/prysmaticlabs/prysm/v4/consensus-types"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
@@ -21,7 +22,7 @@ type SignedBid interface {
 // Bid is an interface describing the method set of a builder bid.
 type Bid interface {
 	Header() (interfaces.ExecutionData, error)
-	BlobKzgCommitments() ([][]byte, error)
+	BlindedBlobsBundle() (*enginev1.BlindedBlobsBundle, error)
 	Value() []byte
 	Pubkey() []byte
 	Version() int
@@ -114,9 +115,9 @@ func (b builderBid) Header() (interfaces.ExecutionData, error) {
 	return blocks.WrappedExecutionPayloadHeader(b.p.Header)
 }
 
-// BlobKzgCommitments --
-func (b builderBid) BlobKzgCommitments() ([][]byte, error) {
-	return [][]byte{}, errors.New("blob kzg commitments not available before Deneb")
+// BlindedBlobsBundle --
+func (b builderBid) BlindedBlobsBundle() (*enginev1.BlindedBlobsBundle, error) {
+	return nil, errors.New("blinded blobs bundle not available before Deneb")
 }
 
 // Version --
@@ -168,9 +169,9 @@ func (b builderBidCapella) Header() (interfaces.ExecutionData, error) {
 	return blocks.WrappedExecutionPayloadHeaderCapella(b.p.Header, blocks.PayloadValueToGwei(b.p.Value))
 }
 
-// BlobKzgCommitments --
-func (b builderBidCapella) BlobKzgCommitments() ([][]byte, error) {
-	return [][]byte{}, errors.New("blob kzg commitments not available before Deneb")
+// BlindedBlobsBundle --
+func (b builderBidCapella) BlindedBlobsBundle() (*enginev1.BlindedBlobsBundle, error) {
+	return nil, errors.New("blinded blobs bundle not available before Deneb")
 }
 
 // Version --
@@ -252,9 +253,9 @@ func (b builderBidDeneb) Header() (interfaces.ExecutionData, error) {
 	return blocks.WrappedExecutionPayloadHeaderDeneb(b.p.Header, blocks.PayloadValueToGwei(b.p.Value))
 }
 
-// BlobKzgCommitments --
-func (b builderBidDeneb) BlobKzgCommitments() ([][]byte, error) {
-	return b.p.BlobKzgCommitments, nil
+// BlindedBlobsBundle --
+func (b builderBidDeneb) BlindedBlobsBundle() (*enginev1.BlindedBlobsBundle, error) {
+	return b.p.BlindedBlobsBundle, nil
 }
 
 type signedBuilderBidDeneb struct {

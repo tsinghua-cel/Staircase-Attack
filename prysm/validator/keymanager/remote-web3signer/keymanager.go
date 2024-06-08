@@ -15,6 +15,7 @@ import (
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpbservice "github.com/prysmaticlabs/prysm/v4/proto/eth/service"
 	validatorpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/validator-client"
 	"github.com/prysmaticlabs/prysm/v4/validator/accounts/petnames"
 	"github.com/prysmaticlabs/prysm/v4/validator/keymanager"
@@ -112,27 +113,95 @@ func getSignRequestJson(ctx context.Context, validator *validator.Validate, requ
 	}
 	switch request.Object.(type) {
 	case *validatorpb.SignRequest_Block:
-		return handleBlock(ctx, validator, request, genesisValidatorsRoot)
+		bockSignRequest, err := web3signerv1.GetBlockSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, bockSignRequest); err != nil {
+			return nil, err
+		}
+		blockSignRequestsTotal.Inc()
+		return json.Marshal(bockSignRequest)
 	case *validatorpb.SignRequest_AttestationData:
-		return handleAttestationData(ctx, validator, request, genesisValidatorsRoot)
+		attestationSignRequest, err := web3signerv1.GetAttestationSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, attestationSignRequest); err != nil {
+			return nil, err
+		}
+		attestationSignRequestsTotal.Inc()
+		return json.Marshal(attestationSignRequest)
 	case *validatorpb.SignRequest_AggregateAttestationAndProof:
-		return handleAggregateAttestationAndProof(ctx, validator, request, genesisValidatorsRoot)
+		aggregateAndProofSignRequest, err := web3signerv1.GetAggregateAndProofSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, aggregateAndProofSignRequest); err != nil {
+			return nil, err
+		}
+		aggregateAndProofSignRequestsTotal.Inc()
+		return json.Marshal(aggregateAndProofSignRequest)
 	case *validatorpb.SignRequest_Slot:
-		return handleAggregationSlot(ctx, validator, request, genesisValidatorsRoot)
+		aggregationSlotSignRequest, err := web3signerv1.GetAggregationSlotSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, aggregationSlotSignRequest); err != nil {
+			return nil, err
+		}
+		aggregationSlotSignRequestsTotal.Inc()
+		return json.Marshal(aggregationSlotSignRequest)
 	case *validatorpb.SignRequest_BlockAltair:
-		return handleBlockAltair(ctx, validator, request, genesisValidatorsRoot)
+		blockv2AltairSignRequest, err := web3signerv1.GetBlockAltairSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, blockv2AltairSignRequest); err != nil {
+			return nil, err
+		}
+		blockAltairSignRequestsTotal.Inc()
+		return json.Marshal(blockv2AltairSignRequest)
 	case *validatorpb.SignRequest_BlockBellatrix:
-		return handleBlockBellatrix(ctx, validator, request, genesisValidatorsRoot)
+		blockv2BellatrixSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, blockv2BellatrixSignRequest); err != nil {
+			return nil, err
+		}
+		blockBellatrixSignRequestsTotal.Inc()
+		return json.Marshal(blockv2BellatrixSignRequest)
 	case *validatorpb.SignRequest_BlindedBlockBellatrix:
-		return handleBlindedBlockBellatrix(ctx, validator, request, genesisValidatorsRoot)
+		blindedBlockv2SignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, blindedBlockv2SignRequest); err != nil {
+			return nil, err
+		}
+		blindedBlockBellatrixSignRequestsTotal.Inc()
+		return json.Marshal(blindedBlockv2SignRequest)
 	case *validatorpb.SignRequest_BlockCapella:
-		return handleBlockCapella(ctx, validator, request, genesisValidatorsRoot)
+		blockv2CapellaSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, blockv2CapellaSignRequest); err != nil {
+			return nil, err
+		}
+		blockCapellaSignRequestsTotal.Inc()
+		return json.Marshal(blockv2CapellaSignRequest)
 	case *validatorpb.SignRequest_BlindedBlockCapella:
-		return handleBlindedBlockCapella(ctx, validator, request, genesisValidatorsRoot)
-	case *validatorpb.SignRequest_BlockDeneb:
-		return handleBlockDeneb(ctx, validator, request, genesisValidatorsRoot)
-	case *validatorpb.SignRequest_BlindedBlockDeneb:
-		return handleBlindedBlockDeneb(ctx, validator, request, genesisValidatorsRoot)
+		blindedBlockv2CapellaSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, blindedBlockv2CapellaSignRequest); err != nil {
+			return nil, err
+		}
+		blindedBlockCapellaSignRequestsTotal.Inc()
+		return json.Marshal(blindedBlockv2CapellaSignRequest)
 	// We do not support "DEPOSIT" type.
 	/*
 		case *validatorpb.:
@@ -140,225 +209,68 @@ func getSignRequestJson(ctx context.Context, validator *validator.Validate, requ
 	*/
 
 	case *validatorpb.SignRequest_Epoch:
-		// tech debt that prysm uses signing type epoch
-		return handleRandaoReveal(ctx, validator, request, genesisValidatorsRoot)
+		randaoRevealSignRequest, err := web3signerv1.GetRandaoRevealSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, randaoRevealSignRequest); err != nil {
+			return nil, err
+		}
+		randaoRevealSignRequestsTotal.Inc()
+		return json.Marshal(randaoRevealSignRequest)
 	case *validatorpb.SignRequest_Exit:
-		return handleVoluntaryExit(ctx, validator, request, genesisValidatorsRoot)
+		voluntaryExitRequest, err := web3signerv1.GetVoluntaryExitSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, voluntaryExitRequest); err != nil {
+			return nil, err
+		}
+		voluntaryExitSignRequestsTotal.Inc()
+		return json.Marshal(voluntaryExitRequest)
 	case *validatorpb.SignRequest_SyncMessageBlockRoot:
-		return handleSyncMessageBlockRoot(ctx, validator, request, genesisValidatorsRoot)
+		syncCommitteeMessageRequest, err := web3signerv1.GetSyncCommitteeMessageSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, syncCommitteeMessageRequest); err != nil {
+			return nil, err
+		}
+		syncCommitteeMessageSignRequestsTotal.Inc()
+		return json.Marshal(syncCommitteeMessageRequest)
 	case *validatorpb.SignRequest_SyncAggregatorSelectionData:
-		return handleSyncAggregatorSelectionData(ctx, validator, request, genesisValidatorsRoot)
+		syncCommitteeSelectionProofRequest, err := web3signerv1.GetSyncCommitteeSelectionProofSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, syncCommitteeSelectionProofRequest); err != nil {
+			return nil, err
+		}
+		syncCommitteeSelectionProofSignRequestsTotal.Inc()
+		return json.Marshal(syncCommitteeSelectionProofRequest)
 	case *validatorpb.SignRequest_ContributionAndProof:
-		return handleContributionAndProof(ctx, validator, request, genesisValidatorsRoot)
+		contributionAndProofRequest, err := web3signerv1.GetSyncCommitteeContributionAndProofSignRequest(request, genesisValidatorsRoot)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, contributionAndProofRequest); err != nil {
+			return nil, err
+		}
+		syncCommitteeContributionAndProofSignRequestsTotal.Inc()
+		return json.Marshal(contributionAndProofRequest)
 	case *validatorpb.SignRequest_Registration:
-		return handleRegistration(ctx, validator, request)
+		validatorRegistrationRequest, err := web3signerv1.GetValidatorRegistrationSignRequest(request)
+		if err != nil {
+			return nil, err
+		}
+		if err = validator.StructCtx(ctx, validatorRegistrationRequest); err != nil {
+			return nil, err
+		}
+		validatorRegistrationSignRequestsTotal.Inc()
+		return json.Marshal(validatorRegistrationRequest)
 	default:
 		return nil, fmt.Errorf("web3signer sign request type %T not supported", request.Object)
 	}
-}
-
-func handleBlock(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	bockSignRequest, err := web3signerv1.GetBlockSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, bockSignRequest); err != nil {
-		return nil, err
-	}
-	blockSignRequestsTotal.Inc()
-	return json.Marshal(bockSignRequest)
-}
-
-func handleAttestationData(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	attestationSignRequest, err := web3signerv1.GetAttestationSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, attestationSignRequest); err != nil {
-		return nil, err
-	}
-	attestationSignRequestsTotal.Inc()
-	return json.Marshal(attestationSignRequest)
-}
-
-func handleAggregateAttestationAndProof(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	aggregateAndProofSignRequest, err := web3signerv1.GetAggregateAndProofSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, aggregateAndProofSignRequest); err != nil {
-		return nil, err
-	}
-	aggregateAndProofSignRequestsTotal.Inc()
-	return json.Marshal(aggregateAndProofSignRequest)
-}
-
-func handleAggregationSlot(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	aggregationSlotSignRequest, err := web3signerv1.GetAggregationSlotSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, aggregationSlotSignRequest); err != nil {
-		return nil, err
-	}
-	aggregationSlotSignRequestsTotal.Inc()
-	return json.Marshal(aggregationSlotSignRequest)
-}
-
-func handleBlockAltair(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blockv2AltairSignRequest, err := web3signerv1.GetBlockAltairSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blockv2AltairSignRequest); err != nil {
-		return nil, err
-	}
-	blockAltairSignRequestsTotal.Inc()
-	return json.Marshal(blockv2AltairSignRequest)
-}
-
-func handleBlockBellatrix(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blockv2BellatrixSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blockv2BellatrixSignRequest); err != nil {
-		return nil, err
-	}
-	blockBellatrixSignRequestsTotal.Inc()
-	return json.Marshal(blockv2BellatrixSignRequest)
-}
-
-func handleBlindedBlockBellatrix(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blindedBlockv2SignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blindedBlockv2SignRequest); err != nil {
-		return nil, err
-	}
-	blindedBlockBellatrixSignRequestsTotal.Inc()
-	return json.Marshal(blindedBlockv2SignRequest)
-}
-
-func handleBlockCapella(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blockv2CapellaSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blockv2CapellaSignRequest); err != nil {
-		return nil, err
-	}
-	blockCapellaSignRequestsTotal.Inc()
-	return json.Marshal(blockv2CapellaSignRequest)
-}
-
-func handleBlindedBlockCapella(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blindedBlockv2CapellaSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blindedBlockv2CapellaSignRequest); err != nil {
-		return nil, err
-	}
-	blindedBlockCapellaSignRequestsTotal.Inc()
-	return json.Marshal(blindedBlockv2CapellaSignRequest)
-}
-
-func handleBlockDeneb(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blockv2DenebSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blockv2DenebSignRequest); err != nil {
-		return nil, err
-	}
-	blockDenebSignRequestsTotal.Inc()
-	return json.Marshal(blockv2DenebSignRequest)
-}
-
-func handleBlindedBlockDeneb(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	blindedBlockv2DenebSignRequest, err := web3signerv1.GetBlockV2BlindedSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, blindedBlockv2DenebSignRequest); err != nil {
-		return nil, err
-	}
-	blindedBlockDenebSignRequestsTotal.Inc()
-	return json.Marshal(blindedBlockv2DenebSignRequest)
-}
-
-func handleRandaoReveal(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	randaoRevealSignRequest, err := web3signerv1.GetRandaoRevealSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, randaoRevealSignRequest); err != nil {
-		return nil, err
-	}
-	randaoRevealSignRequestsTotal.Inc()
-	return json.Marshal(randaoRevealSignRequest)
-}
-
-func handleVoluntaryExit(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	voluntaryExitRequest, err := web3signerv1.GetVoluntaryExitSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, voluntaryExitRequest); err != nil {
-		return nil, err
-	}
-	voluntaryExitSignRequestsTotal.Inc()
-	return json.Marshal(voluntaryExitRequest)
-}
-
-func handleSyncMessageBlockRoot(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	syncCommitteeMessageRequest, err := web3signerv1.GetSyncCommitteeMessageSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, syncCommitteeMessageRequest); err != nil {
-		return nil, err
-	}
-	syncCommitteeMessageSignRequestsTotal.Inc()
-	return json.Marshal(syncCommitteeMessageRequest)
-}
-
-func handleSyncAggregatorSelectionData(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	syncCommitteeSelectionProofRequest, err := web3signerv1.GetSyncCommitteeSelectionProofSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, syncCommitteeSelectionProofRequest); err != nil {
-		return nil, err
-	}
-	syncCommitteeSelectionProofSignRequestsTotal.Inc()
-	return json.Marshal(syncCommitteeSelectionProofRequest)
-}
-
-func handleContributionAndProof(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest, genesisValidatorsRoot []byte) ([]byte, error) {
-	contributionAndProofRequest, err := web3signerv1.GetSyncCommitteeContributionAndProofSignRequest(request, genesisValidatorsRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, contributionAndProofRequest); err != nil {
-		return nil, err
-	}
-	syncCommitteeContributionAndProofSignRequestsTotal.Inc()
-	return json.Marshal(contributionAndProofRequest)
-}
-
-func handleRegistration(ctx context.Context, validator *validator.Validate, request *validatorpb.SignRequest) ([]byte, error) {
-	validatorRegistrationRequest, err := web3signerv1.GetValidatorRegistrationSignRequest(request)
-	if err != nil {
-		return nil, err
-	}
-	if err = validator.StructCtx(ctx, validatorRegistrationRequest); err != nil {
-		return nil, err
-	}
-	validatorRegistrationSignRequestsTotal.Inc()
-	return json.Marshal(validatorRegistrationRequest)
 }
 
 // SubscribeAccountChanges returns the event subscription for changes to public keys.
@@ -374,7 +286,7 @@ func (*Keymanager) ExtractKeystores(
 }
 
 // DeleteKeystores is not supported for the remote-web3signer keymanager type.
-func (km *Keymanager) DeleteKeystores(context.Context, [][]byte) ([]*keymanager.KeyStatus, error) {
+func (km *Keymanager) DeleteKeystores(context.Context, [][]byte) ([]*ethpbservice.DeletedKeystoreStatus, error) {
 	return nil, errors.New("Wrong wallet type: web3-signer. Only Imported or Derived wallets can delete accounts")
 }
 
@@ -420,95 +332,71 @@ func DisplayRemotePublicKeys(validatingPubKeys [][48]byte) {
 }
 
 // AddPublicKeys imports a list of public keys into the keymanager for web3signer use. Returns status with message.
-func (km *Keymanager) AddPublicKeys(pubKeys []string) []*keymanager.KeyStatus {
-	importedRemoteKeysStatuses := make([]*keymanager.KeyStatus, len(pubKeys))
-	for i, pubkey := range pubKeys {
+func (km *Keymanager) AddPublicKeys(ctx context.Context, pubKeys [][fieldparams.BLSPubkeyLength]byte) ([]*ethpbservice.ImportedRemoteKeysStatus, error) {
+	if ctx == nil {
+		return nil, errors.New("context is nil")
+	}
+	importedRemoteKeysStatuses := make([]*ethpbservice.ImportedRemoteKeysStatus, len(pubKeys))
+	for i, pubKey := range pubKeys {
 		found := false
-		pubkeyBytes, err := hexutil.Decode(pubkey)
-		if err != nil {
-			importedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-				Status:  keymanager.StatusError,
-				Message: err.Error(),
-			}
-			continue
-		}
-		if len(pubkeyBytes) != fieldparams.BLSPubkeyLength {
-			importedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-				Status:  keymanager.StatusError,
-				Message: fmt.Sprintf("pubkey byte length (%d) did not match bls pubkey byte length (%d)", len(pubkeyBytes), fieldparams.BLSPubkeyLength),
-			}
-			continue
-		}
 		for _, key := range km.providedPublicKeys {
-			if bytes.Equal(key[:], pubkeyBytes) {
+			if bytes.Equal(key[:], pubKey[:]) {
 				found = true
 				break
 			}
 		}
 		if found {
-			importedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-				Status:  keymanager.StatusDuplicate,
-				Message: fmt.Sprintf("Duplicate pubkey: %v, already in use", pubkey),
+			importedRemoteKeysStatuses[i] = &ethpbservice.ImportedRemoteKeysStatus{
+				Status:  ethpbservice.ImportedRemoteKeysStatus_DUPLICATE,
+				Message: fmt.Sprintf("Duplicate pubkey: %v, already in use", hexutil.Encode(pubKey[:])),
 			}
 			continue
 		}
-		km.providedPublicKeys = append(km.providedPublicKeys, bytesutil.ToBytes48(pubkeyBytes))
-		importedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-			Status:  keymanager.StatusImported,
-			Message: fmt.Sprintf("Successfully added pubkey: %v", pubkey),
+		km.providedPublicKeys = append(km.providedPublicKeys, pubKey)
+		importedRemoteKeysStatuses[i] = &ethpbservice.ImportedRemoteKeysStatus{
+			Status:  ethpbservice.ImportedRemoteKeysStatus_IMPORTED,
+			Message: fmt.Sprintf("Successfully added pubkey: %v", hexutil.Encode(pubKey[:])),
 		}
-		log.Debug("Added pubkey to keymanager for web3signer", "pubkey", pubkey)
+		log.Debug("Added pubkey to keymanager for web3signer", "pubkey", hexutil.Encode(pubKey[:]))
 	}
 	km.accountsChangedFeed.Send(km.providedPublicKeys)
-	return importedRemoteKeysStatuses
+	return importedRemoteKeysStatuses, nil
 }
 
 // DeletePublicKeys removes a list of public keys from the keymanager for web3signer use. Returns status with message.
-func (km *Keymanager) DeletePublicKeys(pubKeys []string) []*keymanager.KeyStatus {
-	deletedRemoteKeysStatuses := make([]*keymanager.KeyStatus, len(pubKeys))
+func (km *Keymanager) DeletePublicKeys(ctx context.Context, pubKeys [][fieldparams.BLSPubkeyLength]byte) ([]*ethpbservice.DeletedRemoteKeysStatus, error) {
+	if ctx == nil {
+		return nil, errors.New("context is nil")
+	}
+	deletedRemoteKeysStatuses := make([]*ethpbservice.DeletedRemoteKeysStatus, len(pubKeys))
 	if len(km.providedPublicKeys) == 0 {
 		for i := range deletedRemoteKeysStatuses {
-			deletedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-				Status:  keymanager.StatusNotFound,
+			deletedRemoteKeysStatuses[i] = &ethpbservice.DeletedRemoteKeysStatus{
+				Status:  ethpbservice.DeletedRemoteKeysStatus_NOT_FOUND,
 				Message: "No pubkeys are set in validator",
 			}
 		}
-		return deletedRemoteKeysStatuses
+		return deletedRemoteKeysStatuses, nil
 	}
 	for i, pubkey := range pubKeys {
 		for in, key := range km.providedPublicKeys {
-			pubkeyBytes, err := hexutil.Decode(pubkey)
-			if err != nil {
-				deletedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-					Status:  keymanager.StatusError,
-					Message: err.Error(),
-				}
-				continue
-			}
-			if len(pubkeyBytes) != fieldparams.BLSPubkeyLength {
-				deletedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-					Status:  keymanager.StatusError,
-					Message: fmt.Sprintf("pubkey byte length (%d) did not match bls pubkey byte length (%d)", len(pubkeyBytes), fieldparams.BLSPubkeyLength),
-				}
-				continue
-			}
-			if bytes.Equal(key[:], pubkeyBytes) {
+			if bytes.Equal(key[:], pubkey[:]) {
 				km.providedPublicKeys = append(km.providedPublicKeys[:in], km.providedPublicKeys[in+1:]...)
-				deletedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-					Status:  keymanager.StatusDeleted,
-					Message: fmt.Sprintf("Successfully deleted pubkey: %v", pubkey),
+				deletedRemoteKeysStatuses[i] = &ethpbservice.DeletedRemoteKeysStatus{
+					Status:  ethpbservice.DeletedRemoteKeysStatus_DELETED,
+					Message: fmt.Sprintf("Successfully deleted pubkey: %v", hexutil.Encode(pubkey[:])),
 				}
-				log.Debug("Deleted pubkey from keymanager for web3signer", "pubkey", pubkey)
+				log.Debug("Deleted pubkey from keymanager for web3signer", "pubkey", hexutil.Encode(pubkey[:]))
 				break
 			}
 		}
 		if deletedRemoteKeysStatuses[i] == nil {
-			deletedRemoteKeysStatuses[i] = &keymanager.KeyStatus{
-				Status:  keymanager.StatusNotFound,
-				Message: fmt.Sprintf("Pubkey: %v not found", pubkey),
+			deletedRemoteKeysStatuses[i] = &ethpbservice.DeletedRemoteKeysStatus{
+				Status:  ethpbservice.DeletedRemoteKeysStatus_NOT_FOUND,
+				Message: fmt.Sprintf("Pubkey: %v not found", hexutil.Encode(pubkey[:])),
 			}
 		}
 	}
 	km.accountsChangedFeed.Send(km.providedPublicKeys)
-	return deletedRemoteKeysStatuses
+	return deletedRemoteKeysStatuses, nil
 }

@@ -6,22 +6,15 @@ searching `Consensys' Web3Signer API specification`
 
 issue: https://github.com/prysmaticlabs/prysm/issues/9994
 
-API interface: https://github.com/ethereum/remote-signing-api
+## Support
+
+WIP
 
 ## Features
 
 ### CLI
 
-detailed info found on https://docs.prylabs.network/docs/wallet/web3signer
-
-Flags used on validator client
-- `--validators-external-signer-url=http://localhost:9000`
-
-with hex keys
-- `--validators-external-signer-public-keys=0xa99a...e44c,0xb89b...4a0b`
-
-with url
-- `--validators-external-signer-public-keys=https://web3signer.com/api/v1/eth2/publicKeys`
+WIP
 
 ### API
 

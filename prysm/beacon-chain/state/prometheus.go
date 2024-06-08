@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	Count = promauto.NewGauge(prometheus.GaugeOpts{
+	StateCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "beacon_state_count",
 		Help: "Count the number of active beacon state objects.",
 	})

@@ -5,7 +5,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/v4/config/features"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v4/config/params"
 	consensus_types "github.com/prysmaticlabs/prysm/v4/consensus-types"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -54,7 +53,7 @@ func (b *BeaconState) validatorsReferences() []*ethpb.Validator {
 		return nil
 	}
 
-	res := make([]*ethpb.Validator, len(b.validators), len(b.validators)+int(params.BeaconConfig().MaxDeposits))
+	res := make([]*ethpb.Validator, len(b.validators))
 	for i := 0; i < len(res); i++ {
 		validator := b.validators[i]
 		if validator == nil {
@@ -179,27 +178,6 @@ func (b *BeaconState) PubkeyAtIndex(idx primitives.ValidatorIndex) [fieldparams.
 		return [fieldparams.BLSPubkeyLength]byte{}
 	}
 	return bytesutil.ToBytes48(v.PublicKey)
-}
-
-// PublicKeys builds a list of all validator public keys, with each key's index aligned to its validator index.
-func (b *BeaconState) PublicKeys() ([][fieldparams.BLSPubkeyLength]byte, error) {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	l := b.validatorsLen()
-	res := make([][fieldparams.BLSPubkeyLength]byte, l)
-	for i := 0; i < l; i++ {
-		if features.Get().EnableExperimentalState {
-			val, err := b.validatorsMultiValue.At(b, uint64(i))
-			if err != nil {
-				return nil, err
-			}
-			copy(res[i][:], val.PublicKey)
-		} else {
-			copy(res[i][:], b.validators[i].PublicKey)
-		}
-	}
-	return res, nil
 }
 
 // NumValidators returns the size of the validator registry.
