@@ -23,6 +23,7 @@ type Config struct {
 	Strategy    string      `json:"strategy" toml:"strategy"`
 	DbConfig    MysqlConfig `json:"mysql" toml:"mysql"`
 	SwagHost    string      `json:"swag_host" toml:"swag_host"`
+	RewardFile  string      `json:"reward_file" toml:"reward_file"`
 }
 
 var _cfg *Config = nil

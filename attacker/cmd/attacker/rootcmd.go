@@ -155,6 +155,7 @@ func getRewardBackgroud() {
 			if err != nil {
 				log.WithError(err).Error("collect reward failed")
 			}
+			reward.GetRewards(config.GetConfig().BeaconRpc, config.GetConfig().RewardFile)
 		}
 	}
 }
