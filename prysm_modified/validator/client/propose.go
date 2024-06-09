@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
+	"github.com/tsinghua-cel/attacker-service/types"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -51,10 +51,6 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	}
 	ctx, span := trace.StartSpan(ctx, "validator.ProposeBlock")
 	defer span.End()
-
-	// change deadline ctx.
-	ctx = context.Background()
-	log.WithField("slot", slot).Info("update context.")
 
 	lock := async.NewMultilock(fmt.Sprint(iface.RoleProposer), string(pubKey[:]))
 	lock.Lock()
@@ -124,7 +120,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	client := attacker.GetAttacker()
 	if client != nil {
 		for {
-			pbBlk, _ := blk.PbCapellaBlock()
+			pbBlk, _ := blk.Proto()
 			signedBlockdata, err := proto.Marshal(pbBlk)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
@@ -132,12 +128,12 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			}
 			result, err := client.BlockAfterSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(signedBlockdata))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt ProposeBlock by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -211,20 +207,19 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	}
 	if client != nil {
 		for {
-			capella := genericSignedBlock.GetCapella()
-			blockData, err := proto.Marshal(capella)
+			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
 			}
-			result, err := client.BlockBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(blockData))
+			result, err := client.BlockBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt ProposeBlock by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -247,20 +242,19 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 
 	if client != nil {
 		for {
-			capella := genericSignedBlock.GetCapella()
-			blockData, err := proto.Marshal(capella)
+			genericSignedBlockData, err := proto.Marshal(genericSignedBlock)
 			if err != nil {
 				log.WithError(err).Error("Failed to marshal block")
 				break
 			}
-			result, err := client.BlockAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(blockData))
+			result, err := client.BlockAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(genericSignedBlockData))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt ProposeBlock by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {

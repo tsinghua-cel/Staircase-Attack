@@ -6,24 +6,14 @@ import (
 	"io/ioutil"
 )
 
-type MysqlConfig struct {
-	Host   string `json:"host" toml:"host"`
-	Port   int    `json:"port" toml:"port"`
-	User   string `json:"user" toml:"user"`
-	Passwd string `json:"password" toml:"password"`
-	DbName string `json:"database" toml:"database"`
-}
-
 type Config struct {
-	HttpPort    int         `json:"http_port" toml:"http_port"`
-	HttpHost    string      `json:"http_host" toml:"http_host"`
-	ExecuteRpc  string      `json:"execute_rpc" toml:"execute_rpc"`
-	BeaconRpc   string      `json:"beacon_rpc" toml:"beacon_rpc"`
-	MetricsPort int         `json:"metrics_port" toml:"metrics_port"`
-	Strategy    string      `json:"strategy" toml:"strategy"`
-	DbConfig    MysqlConfig `json:"mysql" toml:"mysql"`
-	SwagHost    string      `json:"swag_host" toml:"swag_host"`
-	RewardFile  string      `json:"reward_file" toml:"reward_file"`
+	HttpPort    int    `json:"http_port" toml:"http_port"`
+	HttpHost    string `json:"http_host" toml:"http_host"`
+	ExecuteRpc  string `json:"execute_rpc" toml:"execute_rpc"`
+	BeaconRpc   string `json:"beacon_rpc" toml:"beacon_rpc"`
+	MetricsPort int    `json:"metrics_port" toml:"metrics_port"`
+	Strategy    string `json:"strategy" toml:"strategy"`
+	RewardFile  string `json:"reward_file" toml:"reward_file"`
 }
 
 var _cfg *Config = nil

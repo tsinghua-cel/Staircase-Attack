@@ -1,4 +1,4 @@
-.PHONY: default attacker reward all clean docker docs
+.PHONY: default attacker reward all clean docker
 
 GOBIN = $(shell pwd)/build/bin
 TAG ?= latest
@@ -28,9 +28,6 @@ attacker:
 reward:
 	go build $(BUILD_FLAGS) -o=${GOBIN}/$@ -gcflags "all=-N -l" ./cmd/rewards
 	@echo "Done building."
-
-docs:
-	@swag init -g ./openapi/server.go
 
 clean:
 	rm -fr build/*

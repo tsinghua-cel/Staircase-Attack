@@ -7,17 +7,62 @@ import (
 	"os"
 )
 
+type ValidatorStrategy struct {
+	ValidatorIndex    int `json:"validator_index"`
+	AttackerStartSlot int `json:"attacker_start_slot"`
+	AttackerEndSlot   int `json:"attacker_end_slot"`
+}
+
+type BlockStrategy struct {
+	DelayEnable    bool  `json:"delay_enable"`
+	BroadCastDelay int64 `json:"broad_cast_delay"` // unit millisecond
+	ModifyEnable   bool  `json:"modify_enable"`
+}
+
+type AttestStrategy struct {
+	DelayEnable    bool  `json:"delay_enable"`
+	BroadCastDelay int64 `json:"broad_cast_delay"` // unit millisecond
+	ModifyEnable   bool  `json:"modify_enable"`
+	//lua scripts  => modify attest
+}
+
 var (
-	defaultValidators = make([]types.ValidatorStrategy, 0)
-	defaultSlots      = make([]types.SlotStrategy, 0)
+	defaultValidators    = []ValidatorStrategy{}
+	defaultBlockStrategy = BlockStrategy{
+		DelayEnable:    false,
+		BroadCastDelay: 3000, // 3s
+		ModifyEnable:   false,
+	}
+	defaultAttestStrategy = AttestStrategy{
+		DelayEnable:    false,
+		BroadCastDelay: 3000, // 3s
+		ModifyEnable:   false,
+	}
 )
 
-func ParseStrategy(backend types.ServiceBackend, file string) *types.Strategy {
-	var defautConfig = &types.Strategy{
-		Slots:      defaultSlots,
-		Validators: defaultValidators,
+type Strategy struct {
+	Validators []ValidatorStrategy `json:"validator"`
+	Block      BlockStrategy       `json:"block"`
+	Attest     AttestStrategy      `json:"attest"`
+}
+
+func (s *Strategy) GetValidatorRole(valIdx int, slot int64) types.RoleType {
+	for _, v := range s.Validators {
+		if v.ValidatorIndex == valIdx {
+			if slot >= int64(v.AttackerStartSlot) && slot <= int64(v.AttackerEndSlot) {
+				return types.AttackerRole
+			}
+		}
 	}
-	var s types.Strategy
+	return types.NormalRole
+}
+
+func ParseStrategy(file string) *Strategy {
+	var defautConfig = &Strategy{
+		Block:  defaultBlockStrategy,
+		Attest: defaultAttestStrategy,
+	}
+	var s Strategy
 	d, err := os.ReadFile(file)
 	if err != nil {
 		log.WithError(err).Error("read strategy failed, use default config")

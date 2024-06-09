@@ -1,204 +1,115 @@
 package apis
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	log "github.com/sirupsen/logrus"
-	"github.com/tsinghua-cel/attacker-service/common"
-	"github.com/tsinghua-cel/attacker-service/plugins"
-	"github.com/tsinghua-cel/attacker-service/strategy/slotstrategy"
+	"github.com/tsinghua-cel/attacker-service/strategy"
 	"github.com/tsinghua-cel/attacker-service/types"
+	"google.golang.org/protobuf/proto"
 )
 
 // AttestAPI offers and API for attestation operations.
 type AttestAPI struct {
-	b      Backend
-	plugin plugins.AttackerPlugin
+	b Backend
 }
 
-// NewAttestAPI creates a new tx pool service that gives information about the transaction pool.
-func NewAttestAPI(b Backend, plugin plugins.AttackerPlugin) *AttestAPI {
-	return &AttestAPI{b, plugin}
+// NewBlockAPI creates a new tx pool service that gives information about the transaction pool.
+func NewAttestAPI(b Backend) *AttestAPI {
+	return &AttestAPI{b}
 }
 
-func findMaxLevelStrategy(is []slotstrategy.InternalSlotStrategy, slot int64) (slotstrategy.InternalSlotStrategy, bool) {
-	if len(is) == 0 {
-		return slotstrategy.InternalSlotStrategy{}, false
+func (s *AttestAPI) GetStrategy() []byte {
+	d, _ := json.Marshal(s.b.GetStrategy().Attest)
+	return d
+}
+
+func (s *AttestAPI) UpdateStrategy(data []byte) error {
+	var attestStrategy strategy.AttestStrategy
+	if err := json.Unmarshal(data, &attestStrategy); err != nil {
+		return err
 	}
-	last := is[0]
-	for _, s := range is {
-		if s.Slot.Compare(slot) == 0 && s.Level > last.Level {
-			last = s
-		}
-	}
-	return last, last.Slot.Compare(slot) == 0
+	s.b.GetStrategy().Attest = attestStrategy
+	log.Infof("attest strategy updated to %v\n", attestStrategy)
+	return nil
 }
 
 func (s *AttestAPI) BeforeBroadCast(slot uint64) types.AttackerResponse {
-	result := types.AttackerResponse{
+	return types.AttackerResponse{
 		Cmd: types.CMD_NULL,
 	}
-
-	if st, find := findMaxLevelStrategy(s.b.GetInternalSlotStrategy(), int64(slot)); find {
-		action := st.Actions["AttestBeforeBroadCast"]
-		if action != nil {
-			r := action.RunAction(s.b, int64(slot), "")
-			result.Cmd = r.Cmd
-		}
-	}
-	log.WithFields(log.Fields{
-		"cmd":  result.Cmd,
-		"slot": slot,
-	}).Info("exit AttestBeforeBroadCast")
-
-	return result
 }
 
 func (s *AttestAPI) AfterBroadCast(slot uint64) types.AttackerResponse {
-	result := types.AttackerResponse{
+	return types.AttackerResponse{
 		Cmd: types.CMD_NULL,
 	}
-	if st, find := findMaxLevelStrategy(s.b.GetInternalSlotStrategy(), int64(slot)); find {
-		action := st.Actions["AttestAfterBroadCast"]
-		if action != nil {
-			r := action.RunAction(s.b, int64(slot), "")
-			result.Cmd = r.Cmd
-		}
-	}
-	log.WithFields(log.Fields{
-		"cmd":  result.Cmd,
-		"slot": slot,
-	}).Info("exit AttestAfterBroadCast")
-
-	return result
 }
 
 func (s *AttestAPI) BeforeSign(slot uint64, pubkey string, attestDataBase64 string) types.AttackerResponse {
-	result := types.AttackerResponse{
+	return types.AttackerResponse{
 		Cmd:    types.CMD_NULL,
 		Result: attestDataBase64,
 	}
-
-	attestation, err := common.Base64ToAttestationData(attestDataBase64)
-	if err != nil {
-		return types.AttackerResponse{
-			Cmd:    types.CMD_NULL,
-			Result: attestDataBase64,
-		}
-	}
-
-	if st, find := findMaxLevelStrategy(s.b.GetInternalSlotStrategy(), int64(slot)); find {
-		action := st.Actions["AttestBeforeSign"]
-		if action != nil {
-			r := action.RunAction(s.b, int64(slot), pubkey, attestation)
-			result.Cmd = r.Cmd
-			newAttestation, ok := r.Result.(*ethpb.AttestationData)
-			if ok {
-				newData, _ := common.AttestationDataToBase64(newAttestation)
-				result.Result = newData
-			}
-		}
-	}
-	log.WithFields(log.Fields{
-		"cmd":  result.Cmd,
-		"slot": slot,
-	}).Info("exit AttestBeforeSign")
-	return result
 }
 
 func (s *AttestAPI) AfterSign(slot uint64, pubkey string, signedAttestDataBase64 string) types.AttackerResponse {
-	signedAttestData, err := common.Base64ToSignedAttestation(signedAttestDataBase64)
+	signedAttestData, err := base64.StdEncoding.DecodeString(signedAttestDataBase64)
 	if err != nil {
+		log.WithError(err).Error("base64 decode attest data failed")
 		return types.AttackerResponse{
 			Cmd:    types.CMD_NULL,
 			Result: signedAttestDataBase64,
 		}
 	}
-	result := types.AttackerResponse{
-		Cmd:    types.CMD_NULL,
-		Result: signedAttestDataBase64,
+	if role := s.b.GetValidatorRoleByPubkey(int(slot), pubkey); role == types.NormalRole {
+		return types.AttackerResponse{
+			Cmd:    types.CMD_NULL,
+			Result: signedAttestDataBase64,
+		}
 	}
-
-	if t, find := findMaxLevelStrategy(s.b.GetInternalSlotStrategy(), int64(slot)); find {
-		action := t.Actions["AttestAfterSign"]
-		if action != nil {
-			r := action.RunAction(s.b, int64(slot), pubkey, signedAttestData)
-			result.Cmd = r.Cmd
-			newAttestation, ok := r.Result.(*ethpb.Attestation)
-			if ok {
-				newData, _ := common.SignedAttestationToBase64(newAttestation)
-				result.Result = newData
-			}
+	var attest = new(ethpb.Attestation)
+	if err := proto.Unmarshal(signedAttestData, attest); err != nil {
+		log.WithError(err).Error("unmarshal attest data failed")
+		return types.AttackerResponse{
+			Cmd:    types.CMD_NULL,
+			Result: signedAttestDataBase64,
 		}
 	}
 	log.WithFields(log.Fields{
-		"cmd":  result.Cmd,
-		"slot": slot,
-	}).Info("exit AttestAfterSign")
-	return result
+		"slot":   slot,
+		"pubkey": pubkey,
+	}).Debug("receive signed attest")
+	s.b.AddSignedAttestation(slot, pubkey, attest)
+
+	return types.AttackerResponse{
+		Cmd:    types.CMD_NULL,
+		Result: signedAttestDataBase64,
+	}
 }
 
 func (s *AttestAPI) BeforePropose(slot uint64, pubkey string, signedAttestDataBase64 string) types.AttackerResponse {
-	signedAttest, err := common.Base64ToSignedAttestation(signedAttestDataBase64)
-	if err != nil {
-		return types.AttackerResponse{
-			Cmd:    types.CMD_NULL,
-			Result: signedAttestDataBase64,
-		}
-	}
-	result := types.AttackerResponse{
-		Cmd:    types.CMD_NULL,
-		Result: signedAttestDataBase64,
+	isAttacker := false
+	if s.b.GetValidatorRoleByPubkey(int(slot), pubkey) == types.AttackerRole {
+		isAttacker = true
 	}
 
-	if t, find := findMaxLevelStrategy(s.b.GetInternalSlotStrategy(), int64(slot)); find {
-		action := t.Actions["AttestBeforePropose"]
-		if action != nil {
-			r := action.RunAction(s.b, int64(slot), pubkey, signedAttest)
-			result.Cmd = r.Cmd
-			newAttestation, ok := r.Result.(*ethpb.Attestation)
-			if ok {
-				newData, _ := common.SignedAttestationToBase64(newAttestation)
-				result.Result = newData
-			}
+	if isAttacker { // 所有的恶意节点不广播Attestation.
+		log.WithFields(log.Fields{}).Debug("this is attacker, not broadcast attest")
+		return types.AttackerResponse{
+			Cmd: types.CMD_RETURN,
+		}
+	} else {
+		return types.AttackerResponse{
+			Cmd: types.CMD_NULL,
 		}
 	}
-	log.WithFields(log.Fields{
-		"cmd":  result.Cmd,
-		"slot": slot,
-	}).Info("exit AttestBeforePropose")
-	return result
 }
 
 func (s *AttestAPI) AfterPropose(slot uint64, pubkey string, signedAttestDataBase64 string) types.AttackerResponse {
-	signedAttest, err := common.Base64ToSignedAttestation(signedAttestDataBase64)
-	if err != nil {
-		return types.AttackerResponse{
-			Cmd:    types.CMD_NULL,
-			Result: signedAttestDataBase64,
-		}
-	}
-	result := types.AttackerResponse{
+	return types.AttackerResponse{
 		Cmd:    types.CMD_NULL,
 		Result: signedAttestDataBase64,
 	}
-
-	if t, find := findMaxLevelStrategy(s.b.GetInternalSlotStrategy(), int64(slot)); find {
-		action := t.Actions["AttestAfterPropose"]
-		if action != nil {
-			r := action.RunAction(s.b, int64(slot), pubkey, signedAttest)
-			result.Cmd = r.Cmd
-			newAttestation, ok := r.Result.(*ethpb.Attestation)
-			if ok {
-				newData, _ := common.SignedAttestationToBase64(newAttestation)
-				result.Result = newData
-			}
-		}
-	}
-
-	log.WithFields(log.Fields{
-		"cmd":  result.Cmd,
-		"slot": slot,
-	}).Info("exit AttestAfterPropose")
-
-	return result
 }

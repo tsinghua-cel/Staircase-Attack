@@ -63,7 +63,7 @@ func TestGetLatestBeaconHeader(t *testing.T) {
 func TestGetAllAttestDuties(t *testing.T) {
 	endpoint := "52.221.177.10:14000" // grpc gateway endpoint
 	client := NewBeaconGwClient(endpoint)
-	duties, err := client.GetProposerDuties(2)
+	duties, err := client.GetProposerDuties(1)
 	//duties, err := client.GetCurrentEpochProposerDuties()
 	if err != nil {
 		t.Fatalf("get proposer duties failed err:%s", err)

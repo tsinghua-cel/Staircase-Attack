@@ -1,4 +1,4 @@
-package types
+package beaconapi
 
 import "encoding/json"
 
@@ -48,16 +48,4 @@ type AttestDuty struct {
 
 type BeaconResponse struct {
 	Data json.RawMessage `json:"data"`
-}
-
-type ReorgEvent struct {
-	Epoch                 int64  `json:"epoch"`
-	Slot                  int64  `json:"slot"`
-	Depth                 int64  `json:"depth"`
-	OldBlockSlot          int64  `json:"old_block_slot"`
-	NewBlockSlot          int64  `json:"new_block_slot"`
-	OldBlockProposerIndex int64  `json:"old_block_proposer_index"`
-	NewBlockProposerIndex int64  `json:"new_block_proposer_index"`
-	OldHeadState          string `json:"old_head_state"`
-	NewHeadState          string `json:"new_head_state"`
 }

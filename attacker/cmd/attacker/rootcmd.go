@@ -1,16 +1,12 @@
 package main
 
 import (
-	"fmt"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/tsinghua-cel/attacker-service/cmd/attacker/testcases"
 	"github.com/tsinghua-cel/attacker-service/config"
-	"github.com/tsinghua-cel/attacker-service/dbmodel"
-	"github.com/tsinghua-cel/attacker-service/docs"
 	"github.com/tsinghua-cel/attacker-service/reward"
 	"github.com/tsinghua-cel/attacker-service/server"
 	"time"
@@ -76,18 +72,15 @@ func initConfig() {
 		return
 	}
 
-	conf, err := config.ParseConfig(viper.ConfigFileUsed())
+	_, err := config.ParseConfig(viper.ConfigFileUsed())
 	if err != nil {
 		log.WithField("error", err).Fatal("parse config failed")
-	}
-	if len(conf.SwagHost) != 0 {
-		docs.SwaggerInfo.Host = fmt.Sprintf("%s", conf.SwagHost)
 	}
 }
 
 func runNode() {
-	dbmodel.DbInit(config.GetConfig().DbConfig)
-	rpcServer := server.NewServer(config.GetConfig(), testcases.NewCaseV1())
+
+	rpcServer := server.NewServer()
 	rpcServer.Start()
 
 	go getRewardBackgroud()
@@ -149,13 +142,12 @@ func getRewardBackgroud() {
 		case <-ticker.C:
 			log.WithFields(log.Fields{
 				"beacon": config.GetConfig().BeaconRpc,
+				"file":   config.GetConfig().RewardFile,
 			}).Debug("goto get reward")
-			err := reward.GetRewardsToMysql(config.GetConfig().BeaconRpc)
-			//err := reward.GetRewards(config.GetConfig().BeaconRpc, config.GetConfig().RewardFile)
+			err := reward.GetRewards(config.GetConfig().BeaconRpc, config.GetConfig().RewardFile)
 			if err != nil {
 				log.WithError(err).Error("collect reward failed")
 			}
-			reward.GetRewards(config.GetConfig().BeaconRpc, config.GetConfig().RewardFile)
 		}
 	}
 }

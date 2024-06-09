@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prysmaticlabs/prysm/v4/attacker"
-	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
+	"github.com/tsinghua-cel/attacker-service/types"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"strings"
@@ -104,12 +104,12 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 			}
 			result, err := client.AttestBeforeSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt SubmitAttestation by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -194,12 +194,12 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 			}
 			result, err := client.AttestAfterSign(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt SubmitAttestation by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -244,12 +244,12 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 			}
 			result, err := client.AttestBeforePropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt SubmitAttestation by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {
@@ -280,12 +280,12 @@ func (v *validator) SubmitAttestation(ctx context.Context, slot primitives.Slot,
 			}
 			result, err := client.AttestAfterPropose(context.Background(), uint64(slot), hex.EncodeToString(pubKey[:]), base64.StdEncoding.EncodeToString(attestdata))
 			switch result.Cmd {
-			case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+			case types.CMD_EXIT, types.CMD_ABORT:
 				os.Exit(-1)
-			case attackclient.CMD_RETURN:
+			case types.CMD_RETURN:
 				log.Warnf("Interrupt SubmitAttestation by attacker")
 				return
-			case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+			case types.CMD_NULL, types.CMD_CONTINUE:
 				// do nothing.
 			}
 			if err != nil {

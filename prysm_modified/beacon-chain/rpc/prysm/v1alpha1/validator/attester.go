@@ -12,7 +12,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
-	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
+	"github.com/tsinghua-cel/attacker-service/types"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -83,7 +83,7 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 	client := attacker.GetAttacker()
 	skipBroadCast := false
 	if client != nil {
-		var res attackclient.AttackerResponse
+		var res types.AttackerResponse
 		res, err = client.AttestBeforeBroadCast(context.Background(), uint64(att.Data.Slot))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestBeforeBroadCast")
@@ -91,15 +91,15 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 			log.WithField("attacker", "AttestBeforeBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
-		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+		case types.CMD_EXIT, types.CMD_ABORT:
 			os.Exit(-1)
-		case attackclient.CMD_SKIP:
+		case types.CMD_SKIP:
 			skipBroadCast = true
-		case attackclient.CMD_RETURN:
+		case types.CMD_RETURN:
 			return &ethpb.AttestResponse{
 				AttestationDataRoot: root[:],
 			}, nil
-		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+		case types.CMD_NULL, types.CMD_CONTINUE:
 			// do nothing.
 		}
 	}
@@ -112,7 +112,7 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 	}
 
 	if client != nil {
-		var res attackclient.AttackerResponse
+		var res types.AttackerResponse
 		res, err = client.AttestAfterBroadCast(context.Background(), uint64(att.Data.Slot))
 		if err != nil {
 			log.WithField("attacker", "delay").WithField("error", err).Error("An error occurred while AttestAfterBroadCast")
@@ -120,15 +120,15 @@ func (vs *Server) ProposeAttestation(ctx context.Context, att *ethpb.Attestation
 			log.WithField("attacker", "AttestAfterBroadCast").Info("attacker succeed")
 		}
 		switch res.Cmd {
-		case attackclient.CMD_EXIT, attackclient.CMD_ABORT:
+		case types.CMD_EXIT, types.CMD_ABORT:
 			os.Exit(-1)
-		case attackclient.CMD_SKIP:
+		case types.CMD_SKIP:
 			// just nothing to do.
-		case attackclient.CMD_RETURN:
+		case types.CMD_RETURN:
 			return &ethpb.AttestResponse{
 				AttestationDataRoot: root[:],
 			}, nil
-		case attackclient.CMD_NULL, attackclient.CMD_CONTINUE:
+		case types.CMD_NULL, types.CMD_CONTINUE:
 			// do nothing.
 		}
 	}

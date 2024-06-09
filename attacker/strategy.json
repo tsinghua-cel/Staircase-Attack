@@ -1,26 +1,4 @@
 {
-  "slots":[
-    {
-      "slot": "every",
-      "level": 0,
-      "actions": {
-        "AttestAfterSign": "storeSignedAttest",
-        "AttestBeforePropose": "return",
-        "BlockBeforeSign": "return"
-      }
-    },
-    {
-      "slot": "lastAttackerSlotInCurrentEpoch",
-      "level": 1,
-      "actions": {
-        "AttestAfterSign": "storeSignedAttest",
-        "BlockDelayForReceiveBlock":"delayToEpochEnd",
-        "BlockBeforeBroadCast": "delayHalfEpoch",
-        "BlockBeforeSign": "rePackAttestation"
-      }
-    }
-  ],
-
   "validator": [
     {
       "validator_index": 1,

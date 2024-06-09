@@ -1,4 +1,4 @@
-package types
+package validatorSet
 
 import (
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -9,6 +9,9 @@ import (
 type ValidatorInfo struct {
 	Index  int64  `json:"index"`
 	Pubkey string `json:"pubkey"`
+	//Role   types.RoleType `json:"role"`
+	//Attests ValidatorAttestSet `json:"attests"`
+	//Blocks  ValidatorBlockSet  `json:"blocks"`
 }
 
 type ValidatorDataSet struct {

@@ -2,7 +2,7 @@ package attacker
 
 import (
 	"github.com/sirupsen/logrus"
-	attackclient "github.com/tsinghua-cel/attacker-client-go/client"
+	"github.com/tsinghua-cel/attacker-service/attackclient"
 	"os"
 )
 
