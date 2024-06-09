@@ -184,15 +184,21 @@ func (s *Server) monitorDuties() {
 			}
 
 		case <-ticker.C:
-			duties, err := s.beaconClient.GetCurrentEpochAttestDuties()
+			curDuties, err := s.beaconClient.GetCurrentEpochAttestDuties()
 			if err != nil {
 				continue
 			}
-			for _, duty := range duties {
-				idx, _ := strconv.Atoi(duty.ValidatorIndex)
-				s.validatorSetInfo.AddValidator(idx, duty.Pubkey)
+			for _, duty := range curDuties {
+				if idx, err := strconv.Atoi(duty.ValidatorIndex); err == nil {
+					s.validatorSetInfo.AddValidator(idx, duty.Pubkey)
+				}
 			}
-
+			nextDuties, _ := s.beaconClient.GetNextEpochAttestDuties()
+			for _, duty := range nextDuties {
+				if idx, err := strconv.Atoi(duty.ValidatorIndex); err == nil {
+					s.validatorSetInfo.AddValidator(idx, duty.Pubkey)
+				}
+			}
 			ticker.Reset(time.Second * 2)
 
 		}

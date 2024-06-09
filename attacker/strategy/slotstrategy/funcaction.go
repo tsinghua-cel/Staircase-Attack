@@ -314,6 +314,10 @@ func GetFunctionAction(backend types.ServiceBackend, action string) (ActionDo, e
 
 				for publicKey, att := range allSlotAttest.Attestations {
 					val := validatorSet.GetValidatorByPubkey(publicKey)
+					if val == nil {
+						log.WithField("pubkey", publicKey).Debug("validator not found")
+						continue
+					}
 					valRole := backend.GetValidatorRole(int(i), int(val.Index))
 					if val != nil && valRole == types.AttackerRole {
 						log.WithField("pubkey", publicKey).Debug("add attacker attestation to block")
